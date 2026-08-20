@@ -142,6 +142,7 @@ list: ## 예제 목록
 	@printf '  \033[35m12\033[0m  안티치트 게임 uprobe 로 메모리 조작 치트 탐지 (챌린지)\n'
 	@printf '  \033[35m13\033[0m  미니백신 게임 시그니처 파일 격리 (LSM, 챌린지)\n'
 	@printf '  \033[35m14\033[0m  IDS/IPS 게임  페이로드 시그니처 탐지·차단 (챌린지)\n'
+	@printf '\n  \033[36m00\033[0m  훅 사냥       코드 없이 "어디에 붙일지" 만 찾는다  (\033[36mmake hunt\033[0m)\n'
 	@printf '\n  실행:  make 01   (make 07 ARGS="-metrics :9101" 처럼 인자 전달 가능)\n'
 	@printf '  \033[1m전 랩 공통:\033[0m  .bpf.c 의 TODO 를 Lv1 부터 채우고  \033[36mmake NN-check\033[0m  로 채점 (70점 통과)\n'
 	@printf '  통과 후:  \033[36mopen examples/NN-*/STUDY.html\033[0m  (이론 + 동작 해부 + OX 퀴즈)\n\n'
@@ -182,6 +183,21 @@ workload-stop: ## uprobe 타깃 종료
 07: $(call stamp,07) ## 실무형 런타임 감시 에이전트 실행
 	@$(ENSURE)
 	$(RUN) go run ./examples/07-runtime-audit $(ARGS)
+
+# ---------------------------------------------------------------- 00 훅 사냥
+# 코드를 쓰기 전 단계. "어디에 붙일 것인가" 만 훈련한다.
+.PHONY: hunt hunt-check
+hunt: ## 00 훅 사냥 — 목표 문서 열기 (코드 없이 훅만 찾는다)
+	@printf '\n\033[1m00. 훅 사냥\033[0m — 어디에 붙일 것인가만 훈련한다\n\n'
+	@printf '  1) 목표 읽기:   \033[36mexamples/00-hunt/TARGETS.md\033[0m\n'
+	@printf '  2) 답안 작성:   \033[36mexamples/00-hunt/answers.txt\033[0m\n'
+	@printf '  3) 채점:        \033[36mmake hunt-check\033[0m\n'
+	@printf '  4) 정리:        \033[36mopen examples/00-hunt/STUDY.html\033[0m\n\n'
+	@printf '  탐색은 컨테이너 안에서:  \033[36mmake sh\033[0m\n\n'
+
+hunt-check: ## 00 훅 사냥 채점 (존재 검증 + 정답 검증, 10문제)
+	@$(ENSURE)
+	$(RUN) bash examples/00-hunt/check.sh
 
 # ---------------------------------------------------------------- 학습 트랙 채점
 # 01~07 도 08~14 와 동일한 "빈칸 -> 채점" 방식이다.

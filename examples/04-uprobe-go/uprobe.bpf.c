@@ -55,7 +55,35 @@ struct {
 
 /* SEC 이름의 "uprobe/..." 뒷부분은 라벨일 뿐이다. 실제 대상 파일/심볼은
  * 유저 공간(Go)에서 link.OpenExecutable(...).Uprobe("main.compute", ...) 로 정한다. */
-SEC("uprobe/main.compute")
+	/* ══════════════════════════════════════════════════════════════════
+	 * 🎯 Lv0 [10점] — 어디에 붙을지 직접 찾아라
+	 *
+	 *   훅 선택이 eBPF 개발의 8할이다. 정답을 받아적는 게 아니라
+	 *   찾는 절차를 손에 익히는 게 이 단계의 목적이다.
+	 *
+	 *   uprobe 는 커널이 아니라 "파일의 심볼" 이 대상이다.
+	 *
+	 *   ① 대상 바이너리에 그 심볼이 실제로 있나?
+	 *      go tool nm /opt/lab/bin/workload | grep main.compute
+	 *      -> 없다면 스트립됐거나 인라인된 것 (//go:noinline 으로 막는다)
+	 *
+	 *   ② C/C++ 바이너리라면
+	 *      nm -D /usr/lib/libssl.so | grep SSL_write
+	 *
+	 *   ③ 이 파일이 uprobe 를 걸 수 있는 파일시스템에 있나?
+	 *      /lab (virtiofs) 위의 파일에는 못 붙는다. make workload 로
+	 *      /opt/lab/bin 에 빌드하는 이유다.
+	 *
+	 *   형식:  SEC("uprobe/<아무 라벨>")
+	 *          뒷부분은 라벨일 뿐 실제 대상은 Go 쪽에서 정한다.
+	 *          하지만 앞의 "uprobe" 는 프로그램 타입이라 정확해야 한다.
+	 *
+	 *   ✅ 통과 조건: 프로그램이 "부착 완료" 를 출력한다
+	 *   ⚠️  지금은 SEC("TODO") 라서 로드 자체가 실패한다:
+	 *      "program type is unspecified"
+	 *      섹션 이름이 곧 프로그램 타입이기 때문이다.
+	 * ══════════════════════════════════════════════════════════════════ */
+SEC("TODO")
 int BPF_UPROBE(uprobe_compute, long n)
 {
 	struct event *e;

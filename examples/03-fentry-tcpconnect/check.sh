@@ -12,13 +12,26 @@ card() {
 }
 skip() { total=$((total+$1)); printf '  \033[90m⏭  [  0점] %-30s %s\033[0m\n' "$2" "${3:-}"; }
 
+finish() {
+echo "──────────────────────────────────────────────"
+printf '  점수: \033[1m%d/%d\033[0m   (통과 기준 %d점)\n' "$score" "$total" "$PASS_MARK"
+if [ "$score" -ge "$PASS_MARK" ]; then
+  printf '  \033[32m🎉 클리어! kprobe 의 자유도 + tracepoint 의 안전성을 동시에 얻었다.\033[0m\n'
+  printf '  다음: examples/03-fentry-tcpconnect/STUDY.html (이론 + OX 퀴즈) → make 04\n'
+  exit 0
+else
+  printf '  \033[33m아직이다. tcpconnect.bpf.c 의 TODO 를 순서대로 채워라. (막히면 solution/)\033[0m\n'
+  exit 1
+fi
+}
+
 echo "╔═══ 03. fentry/fexit tcp_connect 채점 ═══╗"
 
 go generate ./examples/03-fentry-tcpconnect/ >/dev/null 2>&1
 if go build -o bin/03-fentry-tcpconnect ./examples/03-fentry-tcpconnect 2>/tmp/03b.txt; then
-  card 15 1 "Lv0 빌드"
+  card 5 1 "Lv0-a 빌드"
 else
-  card 15 0 "Lv0 빌드 실패" "$(head -3 /tmp/03b.txt | tr '\n' ' ')"
+  card 5 0 "Lv0-a 빌드 실패" "$(head -3 /tmp/03b.txt | tr '\n' ' ')"
   echo "  → fentry 는 시그니처가 틀리면 verifier 가 거부한다. 인자 타입을 확인하라."
   exit 1
 fi
@@ -38,6 +51,20 @@ CALLS=$(grep -aoE '누적: tcp_connect [0-9]+ 건' /tmp/03.txt | grep -oE '[0-9]
 V6=$(grep -aoE 'IPv6 [0-9]+' /tmp/03.txt | grep -oE '[0-9]+' | sort -n | tail -1); V6=${V6:-0}
 ROWS=$(awk '$1 ~ /^[0-9]+$/ && /->/ {print}' /tmp/03.txt || true)
 NROWS=$(printf '%s' "$ROWS" | grep -c . || true)
+
+# ---------------------------------------------------------------- Lv0-b 훅 부착
+if grep -aq '부착' /tmp/03.txt; then
+  card 10 1 "Lv0-b 훅에 부착 성공"
+else
+  card 10 0 "Lv0-b 훅 부착 실패" "SEC() 을 직접 찾아 채워라"
+  echo "  ↳ $(grep -am1 'unspecified\|실패\|rror' /tmp/03.txt || echo '프로그램이 부착 메시지를 출력하지 못했다')"
+  echo "  → fentry 는 SEC 에 대상 함수가 들어간다. bpftrace -l 'kfunc:*tcp_connect*' 로 찾아라. fexit 도 같이."
+  skip 30 "Lv1 (Lv0 먼저)"
+  skip 25 "Lv2 (Lv0 먼저)"
+  skip 20 "Lv3 (Lv0 먼저)"
+  skip 10 "Lv4 (Lv0 먼저)"
+  finish
+fi
 
 # ---------------------------------------------------------------- Lv1
 if [ "${NROWS:-0}" -gt 0 ] && [ "$CALLS" -gt 0 ]; then
@@ -89,13 +116,5 @@ else
   skip 10 "Lv4 (보너스, Lv3 먼저)"
 fi
 
-echo "──────────────────────────────────────────────"
-printf '  점수: \033[1m%d/%d\033[0m   (통과 기준 %d점)\n' "$score" "$total" "$PASS_MARK"
-if [ "$score" -ge "$PASS_MARK" ]; then
-  printf '  \033[32m🎉 클리어! kprobe 의 자유도 + tracepoint 의 안전성을 동시에 얻었다.\033[0m\n'
-  printf '  다음: examples/03-fentry-tcpconnect/STUDY.html (이론 + OX 퀴즈) → make 04\n'
-  exit 0
-else
-  printf '  \033[33m아직이다. tcpconnect.bpf.c 의 TODO 를 순서대로 채워라. (막히면 solution/)\033[0m\n'
-  exit 1
-fi
+
+finish

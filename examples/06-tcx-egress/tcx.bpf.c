@@ -104,13 +104,39 @@ static __always_inline int account(struct __sk_buff *skb, __u32 dir)
 	return TCX_NEXT;
 }
 
-SEC("tc")
+	/* ══════════════════════════════════════════════════════════════════
+	 * 🎯 Lv0 [10점] — 어디에 붙을지 직접 찾아라
+	 *
+	 *   훅 선택이 eBPF 개발의 8할이다. 정답을 받아적는 게 아니라
+	 *   찾는 절차를 손에 익히는 게 이 단계의 목적이다.
+	 *
+	 *   여기서는 "함수 찾기" 가 아니라 "어느 훅 계층인가" 를 고른다.
+	 *
+	 *   ① 나가는(egress) 트래픽을 봐야 한다. XDP 로 되나?
+	 *      -> XDP 는 ingress 전용이다. 안 된다.
+	 *
+	 *   ② 그럼 어느 계층인가?
+	 *      skb 가 있는 계층 = TC. 커널 6.6+ 는 TCX 로 붙인다.
+	 *      uname -r        # 6.6 이상인지 확인
+	 *
+	 *   ③ 이 커널이 지원하는 프로그램 타입 목록
+	 *      bpftool feature probe | grep -i sched
+	 *      -> sched_cls (= TC classifier) 가 우리가 쓸 타입이다
+	 *
+	 *   형식:  SEC("tc")   — 짧다. cilium/ebpf 가 이걸 sched_cls 로 매핑한다.
+	 *
+	 *   ✅ 통과 조건: 프로그램이 "부착 완료" 를 출력한다
+	 *   ⚠️  지금은 SEC("TODO") 라서 로드 자체가 실패한다:
+	 *      "program type is unspecified"
+	 *      섹션 이름이 곧 프로그램 타입이기 때문이다.
+	 * ══════════════════════════════════════════════════════════════════ */
+SEC("TODO")
 int tcx_ingress(struct __sk_buff *skb)
 {
 	return account(skb, DIR_INGRESS);
 }
 
-SEC("tc")
+SEC("TODO") /* TODO(Lv0): 위와 같다 */
 int tcx_egress(struct __sk_buff *skb)
 {
 	/* ══════════════════════════════════════════════════════════════════

@@ -192,7 +192,27 @@ static __always_inline void fill_common(struct event *e, __u8 kind, __u64 cgid)
  * comm 은 "실행을 요청한 쪽(보통 셸)" 이름이다. path 가 새로 실행될 파일.
  * 이 차이를 모르고 대시보드를 만들면 계속 헷갈린다.
  */
-SEC("tracepoint/syscalls/sys_enter_execve")
+/* ══════════════════════════════════════════════════════════════════════════
+ * 🎯 Lv0 [10점] — 세 프로브의 훅을 직접 찾아라
+ *
+ *   01~06 에서 배운 훅이 한 파일에 다 모여 있다. 각각 찾아 채운다.
+ *
+ *   ① EXEC — 프로그램 실행을 잡는다
+ *      ls /sys/kernel/debug/tracing/events/syscalls/ | grep execve
+ *      형식: SEC("tracepoint/<그룹>/<이벤트>")
+ *
+ *   ② CONNECT — TCP 연결 시도를 잡는다 (03번과 같은 함수)
+ *      bpftrace -l 'kfunc:*tcp_connect*'
+ *      형식: SEC("fentry/<함수>")
+ *
+ *   ③ UNLINK — 파일 삭제를 잡는다 (01번과 같은 함수)
+ *      grep ' [tT] do_unlinkat$' /proc/kallsyms
+ *      형식: SEC("kprobe/<함수>")
+ *
+ *   ✅ 통과 조건: "프로브 3 개 부착 완료" 가 출력된다
+ *   💡 셋 중 하나만 틀려도 로드가 실패한다. 에러 메시지에 어느 프로그램인지 나온다.
+ * ══════════════════════════════════════════════════════════════════════════ */
+SEC("tracepoint/TODO")
 int trace_execve(struct trace_event_raw_sys_enter *ctx)
 {
 	__u64 cgid = 0;
@@ -225,7 +245,7 @@ int trace_execve(struct trace_event_raw_sys_enter *ctx)
 }
 
 /* ---------------------------------------------------------------- CONNECT */
-SEC("fentry/tcp_connect")
+SEC("fentry/TODO") /* TODO(Lv0) */
 int BPF_PROG(trace_tcp_connect, struct sock *sk)
 {
 	__u64 cgid = 0;
@@ -251,7 +271,7 @@ int BPF_PROG(trace_tcp_connect, struct sock *sk)
 }
 
 /* ---------------------------------------------------------------- UNLINK */
-SEC("kprobe/do_unlinkat")
+SEC("kprobe/TODO") /* TODO(Lv0) */
 int BPF_KPROBE(trace_unlinkat, int dfd, struct filename *name)
 {
 	__u64 cgid = 0;

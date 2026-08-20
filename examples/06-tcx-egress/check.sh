@@ -12,13 +12,24 @@ card() {
 }
 skip() { total=$((total+$1)); printf '  \033[90m⏭  [  0점] %-30s %s\033[0m\n' "$2" "${3:-}"; }
 
+finish() {
+echo "──────────────────────────────────────────────"
+printf '  점수: \033[1m%d/%d\033[0m   (통과 기준 %d점)\n' "$score" "$total" "$PASS_MARK"
+if [ "$score" -ge "$PASS_MARK" ]; then
+  printf '  \033[32m🎉 클리어! Cilium 데이터패스가 서 있는 바로 그 자리를 써 봤다.\033[0m\n'
+  printf '  다음: examples/06-tcx-egress/STUDY.html (이론 + OX 퀴즈) → make 07\n'; exit 0
+else
+  printf '  \033[33m아직이다. tcx.bpf.c 의 TODO 를 순서대로 채워라. (막히면 solution/)\033[0m\n'; exit 1
+fi
+}
+
 echo "╔═══ 06. TCX ingress/egress 집계 채점 ═══╗"
 
 go generate ./examples/06-tcx-egress/ >/dev/null 2>&1
 if go build -o bin/06-tcx-egress ./examples/06-tcx-egress 2>/tmp/06b.txt; then
-  card 15 1 "Lv0 빌드"
+  card 5 1 "Lv0-a 빌드"
 else
-  card 15 0 "Lv0 빌드 실패" "$(head -3 /tmp/06b.txt | tr '\n' ' ')"; exit 1
+  card 5 0 "Lv0-a 빌드 실패" "$(head -3 /tmp/06b.txt | tr '\n' ' ')"; exit 1
 fi
 
 pkill -f bin/06-tcx-egress 2>/dev/null; sleep 0.5
@@ -33,6 +44,20 @@ pkill -f bin/06-tcx-egress 2>/dev/null; sleep 1
 val() { awk -v d="$1" -v c="$2" '$1==d && $2 ~ /^[0-9]+$/ {v=$c+0; if (v>m) m=v} END {print m+0}' /tmp/06.txt; }
 IN_PKT=$(val ingress 2); EG_PKT=$(val egress 2)
 IN_ICMP=$(val ingress 6); IN_TCP=$(val ingress 4)
+
+# ---------------------------------------------------------------- Lv0-b 훅 부착
+if grep -aq '부착' /tmp/06.txt; then
+  card 10 1 "Lv0-b 훅에 부착 성공"
+else
+  card 10 0 "Lv0-b 훅 부착 실패" "SEC() 을 직접 찾아 채워라"
+  echo "  ↳ $(grep -am1 'unspecified\|실패\|rror' /tmp/06.txt || echo '프로그램이 부착 메시지를 출력하지 못했다')"
+  echo "  → XDP 는 ingress 전용이라 못 쓴다. bpftool feature probe | grep -i sched 로 타입을 확인하라."
+  skip 35 "Lv1 (Lv0 먼저)"
+  skip 25 "Lv2 (Lv0 먼저)"
+  skip 15 "Lv3 (Lv0 먼저)"
+  skip 10 "Lv4 (Lv0 먼저)"
+  finish
+fi
 
 if [ "${IN_PKT:-0}" -gt 0 ]; then
   card 35 1 "Lv1 방향별 패킷/바이트" "INGRESS ${IN_PKT}패킷"
@@ -79,11 +104,5 @@ else
   skip 10 "Lv4 (보너스, Lv3 먼저)"
 fi
 
-echo "──────────────────────────────────────────────"
-printf '  점수: \033[1m%d/%d\033[0m   (통과 기준 %d점)\n' "$score" "$total" "$PASS_MARK"
-if [ "$score" -ge "$PASS_MARK" ]; then
-  printf '  \033[32m🎉 클리어! Cilium 데이터패스가 서 있는 바로 그 자리를 써 봤다.\033[0m\n'
-  printf '  다음: examples/06-tcx-egress/STUDY.html (이론 + OX 퀴즈) → make 07\n'; exit 0
-else
-  printf '  \033[33m아직이다. tcx.bpf.c 의 TODO 를 순서대로 채워라. (막히면 solution/)\033[0m\n'; exit 1
-fi
+
+finish

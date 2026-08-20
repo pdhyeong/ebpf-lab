@@ -12,6 +12,17 @@ card() {
 }
 skip() { total=$((total+$1)); printf '  \033[90m⏭  [  0점] %-30s %s\033[0m\n' "$2" "${3:-}"; }
 
+finish() {
+echo "──────────────────────────────────────────────"
+printf '  점수: \033[1m%d/%d\033[0m   (통과 기준 %d점)\n' "$score" "$total" "$PASS_MARK"
+if [ "$score" -ge "$PASS_MARK" ]; then
+  printf '  \033[32m🎉 클리어! 커널 밖(유저 공간) 함수까지 eBPF 로 잡았다.\033[0m\n'
+  printf '  다음: examples/04-uprobe-go/STUDY.html (이론 + OX 퀴즈) → make 05\n'; exit 0
+else
+  printf '  \033[33m아직이다. uprobe.bpf.c 의 TODO 를 순서대로 채워라. (막히면 solution/)\033[0m\n'; exit 1
+fi
+}
+
 echo "╔═══ 04. uprobe Go 함수 트레이싱 채점 ═══╗"
 
 WORKLOAD=/opt/lab/bin/workload
@@ -22,9 +33,9 @@ pgrep -x workload >/dev/null || { nohup "$WORKLOAD" >/tmp/workload.log 2>&1 & sl
 
 go generate ./examples/04-uprobe-go/ >/dev/null 2>&1
 if go build -o bin/04-uprobe-go ./examples/04-uprobe-go 2>/tmp/04b.txt; then
-  card 15 1 "Lv0 빌드"
+  card 5 1 "Lv0-a 빌드"
 else
-  card 15 0 "Lv0 빌드 실패" "$(head -3 /tmp/04b.txt | tr '\n' ' ')"; exit 1
+  card 5 0 "Lv0-a 빌드 실패" "$(head -3 /tmp/04b.txt | tr '\n' ' ')"; exit 1
 fi
 
 pkill -f bin/04-uprobe-go 2>/dev/null; sleep 0.5
@@ -35,6 +46,20 @@ pkill -f bin/04-uprobe-go 2>/dev/null; sleep 1
 # UPTIME PID TID COMM ARG
 ROWS=$(awk 'NF==5 && $2 ~ /^[0-9]+$/ && $5 ~ /^-?[0-9]+$/ {print}' /tmp/04.txt || true)
 NROWS=$(printf '%s' "$ROWS" | grep -c . || true)
+
+# ---------------------------------------------------------------- Lv0-b 훅 부착
+if grep -aq '부착' /tmp/04.txt; then
+  card 10 1 "Lv0-b 훅에 부착 성공"
+else
+  card 10 0 "Lv0-b 훅 부착 실패" "SEC() 을 직접 찾아 채워라"
+  echo "  ↳ $(grep -am1 'unspecified\|실패\|rror' /tmp/04.txt || echo '프로그램이 부착 메시지를 출력하지 못했다')"
+  echo "  → SEC 의 앞부분이 프로그램 타입이다. uprobe 는 무엇으로 시작해야 하나?"
+  skip 30 "Lv1 (Lv0 먼저)"
+  skip 25 "Lv2 (Lv0 먼저)"
+  skip 20 "Lv3 (Lv0 먼저)"
+  skip 10 "Lv4 (Lv0 먼저)"
+  finish
+fi
 
 if [ "${NROWS:-0}" -gt 0 ]; then
   card 30 1 "Lv1 uprobe 이벤트 수신" "${NROWS}건"
@@ -80,11 +105,5 @@ else
   skip 10 "Lv4 (보너스, Lv3 먼저)"
 fi
 
-echo "──────────────────────────────────────────────"
-printf '  점수: \033[1m%d/%d\033[0m   (통과 기준 %d점)\n' "$score" "$total" "$PASS_MARK"
-if [ "$score" -ge "$PASS_MARK" ]; then
-  printf '  \033[32m🎉 클리어! 커널 밖(유저 공간) 함수까지 eBPF 로 잡았다.\033[0m\n'
-  printf '  다음: examples/04-uprobe-go/STUDY.html (이론 + OX 퀴즈) → make 05\n'; exit 0
-else
-  printf '  \033[33m아직이다. uprobe.bpf.c 의 TODO 를 순서대로 채워라. (막히면 solution/)\033[0m\n'; exit 1
-fi
+
+finish

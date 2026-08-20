@@ -1,0 +1,20 @@
+# 00. 훅 사냥 — 답안지
+#
+# 형식:  <번호> = <훅종류> <대상>
+# 예:    1 = tracepoint syscalls/sys_enter_openat
+#        4 = fentry tcp_connect
+#        10 = tc
+#
+# 목표는 TARGETS.md 에 있다.  채점: make hunt-check
+# '#' 로 시작하는 줄은 무시된다.
+
+1 =
+2 =
+3 =
+4 =
+5 =
+6 =
+7 =
+8 =
+9 =
+10 =

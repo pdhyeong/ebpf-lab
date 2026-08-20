@@ -74,7 +74,33 @@ static __always_inline __attribute__((unused)) void bump(__u32 slot)
 }
 
 /* ---- fentry: 함수 진입. 인자를 타입 그대로 받는다 ---- */
-SEC("fentry/tcp_connect")
+	/* ══════════════════════════════════════════════════════════════════
+	 * 🎯 Lv0 [10점] — 어디에 붙을지 직접 찾아라
+	 *
+	 *   훅 선택이 eBPF 개발의 8할이다. 정답을 받아적는 게 아니라
+	 *   찾는 절차를 손에 익히는 게 이 단계의 목적이다.
+	 *
+	 *   ① tracepoint 가 있나?
+	 *      ls /sys/kernel/debug/tracing/events/ | grep -i tcp
+	 *      -> tcp/ 그룹은 있지만 "연결 시도" 지점은 없다. 다음 단계로.
+	 *
+	 *   ② BTF 에 그 함수가 있나? (bpftrace 0.20 은 fentry 를 kfunc 라 부른다)
+	 *      bpftrace -l 'kfunc:*tcp_connect*'
+	 *
+	 *   ③ 시그니처를 확인한다 — fentry 는 틀리면 로드가 거부된다
+	 *      bpftool btf dump file /sys/kernel/btf/vmlinux format c \
+	 *        | grep -w 'tcp_connect'
+	 *      -> int tcp_connect(struct sock *sk)
+	 *
+	 *   형식:  SEC("fentry/<함수이름>")   진입
+	 *          SEC("fexit/<함수이름>")    반환 (아래 함수도 채워야 한다)
+	 *
+	 *   ✅ 통과 조건: 프로그램이 "부착 완료" 를 출력한다
+	 *   ⚠️  지금은 SEC("TODO") 라서 로드 자체가 실패한다:
+	 *      "program type is unspecified"
+	 *      섹션 이름이 곧 프로그램 타입이기 때문이다.
+	 * ══════════════════════════════════════════════════════════════════ */
+SEC("fentry/TODO")
 int BPF_PROG(tcp_connect_entry, struct sock *sk)
 {
 	__u16 family;
@@ -158,7 +184,7 @@ int BPF_PROG(tcp_connect_entry, struct sock *sk)
 /* ---- fexit: 함수 반환. 진입 인자 + 반환값을 함께 받는다 ----
  * kretprobe 로는 sk 를 다시 보려면 진입 시점에 맵에 저장해 뒀어야 한다.
  * fexit 는 그 저장/회수 과정이 통째로 사라진다. */
-SEC("fexit/tcp_connect")
+SEC("fexit/TODO") /* TODO(Lv0): 위와 같은 함수 */
 int BPF_PROG(tcp_connect_exit, struct sock *sk, int ret)
 {
 	/* ══════════════════════════════════════════════════════════════════

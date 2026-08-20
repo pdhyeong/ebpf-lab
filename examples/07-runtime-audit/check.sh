@@ -12,13 +12,24 @@ card() {
 }
 skip() { total=$((total+$1)); printf '  \033[90m⏭  [  0점] %-30s %s\033[0m\n' "$2" "${3:-}"; }
 
+finish() {
+echo "──────────────────────────────────────────────"
+printf '  점수: \033[1m%d/%d\033[0m   (통과 기준 %d점)\n' "$score" "$total" "$PASS_MARK"
+if [ "$score" -ge "$PASS_MARK" ]; then
+  printf '  \033[32m🎉 클리어! 학습 트랙 완주. Tetragon/Falco 의 축소판을 직접 만들었다.\033[0m\n'
+  printf '  다음: examples/07-runtime-audit/STUDY.html (이론 + OX 퀴즈) → 게임 트랙 make 08\n'; exit 0
+else
+  printf '  \033[33m아직이다. audit.bpf.c 의 TODO 를 순서대로 채워라. (막히면 solution/)\033[0m\n'; exit 1
+fi
+}
+
 echo "╔═══ 07. 런타임 감시 에이전트 채점 ═══╗"
 
 go generate ./examples/07-runtime-audit/ >/dev/null 2>&1
 if go build -o bin/07-runtime-audit ./examples/07-runtime-audit 2>/tmp/07b.txt; then
-  card 15 1 "Lv0 빌드"
+  card 5 1 "Lv0-a 빌드"
 else
-  card 15 0 "Lv0 빌드 실패" "$(head -3 /tmp/07b.txt | tr '\n' ' ')"; exit 1
+  card 5 0 "Lv0-a 빌드 실패" "$(head -3 /tmp/07b.txt | tr '\n' ' ')"; exit 1
 fi
 
 TAG="/tmp/ebpflab07-$$"
@@ -37,6 +48,20 @@ pkill -f bin/07-runtime-audit 2>/dev/null; sleep 1.5
 EXECROWS=$(awk '$2=="EXEC" {print}' /tmp/07.txt || true)
 UNLROWS=$(awk '$2=="UNLINK" {print}' /tmp/07.txt || true)
 NEXEC=$(printf '%s' "$EXECROWS" | grep -c . || true)
+
+# ---------------------------------------------------------------- Lv0-b 훅 부착
+if grep -aq '부착' /tmp/07.txt; then
+  card 10 1 "Lv0-b 훅에 부착 성공"
+else
+  card 10 0 "Lv0-b 훅 부착 실패" "SEC() 을 직접 찾아 채워라"
+  echo "  ↳ $(grep -am1 'unspecified\|실패\|rror' /tmp/07.txt || echo '프로그램이 부착 메시지를 출력하지 못했다')"
+  echo "  → 프로브가 셋이다. 하나만 틀려도 로드가 실패한다. 에러 메시지에 어느 프로그램인지 나온다."
+  skip 30 "Lv1 (Lv0 먼저)"
+  skip 25 "Lv2 (Lv0 먼저)"
+  skip 20 "Lv3 (Lv0 먼저)"
+  skip 10 "Lv4 (Lv0 먼저)"
+  finish
+fi
 
 if [ "${NEXEC:-0}" -gt 0 ]; then
   card 30 1 "Lv1 커널 필터 통과 + 이벤트" "EXEC ${NEXEC}건"
@@ -86,11 +111,5 @@ else
 fi
 
 rm -f "$TAG" 2>/dev/null
-echo "──────────────────────────────────────────────"
-printf '  점수: \033[1m%d/%d\033[0m   (통과 기준 %d점)\n' "$score" "$total" "$PASS_MARK"
-if [ "$score" -ge "$PASS_MARK" ]; then
-  printf '  \033[32m🎉 클리어! 학습 트랙 완주. Tetragon/Falco 의 축소판을 직접 만들었다.\033[0m\n'
-  printf '  다음: examples/07-runtime-audit/STUDY.html (이론 + OX 퀴즈) → 게임 트랙 make 08\n'; exit 0
-else
-  printf '  \033[33m아직이다. audit.bpf.c 의 TODO 를 순서대로 채워라. (막히면 solution/)\033[0m\n'; exit 1
-fi
+
+finish
