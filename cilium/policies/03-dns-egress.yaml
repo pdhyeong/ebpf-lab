@@ -1,0 +1,49 @@
+# 실습 3: DNS 기반 egress 정책 - "허용된 도메인만 외부로"
+#
+# 이게 실무에서 가장 많이 쓰이는 형태다. 외부 서비스는 IP 가 계속 바뀌므로
+# IP 로 화이트리스트를 관리할 수 없다. Cilium 은 파드의 DNS 응답을 가로채서
+# (toFQDNs) "이 파드가 방금 example.com 을 물어봤고 답이 1.2.3.4 였다"를
+# 기록한 뒤, 그 IP 만 BPF 정책 맵에 넣어 준다.
+#
+#   kubectl apply -f cilium/policies/03-dns-egress.yaml
+#   kubectl exec tiefighter -- curl -s -m 5 -o /dev/null -w '%{http_code}\n' http://example.com   # 200
+#   kubectl exec tiefighter -- curl -s -m 5 -o /dev/null -w '%{http_code}\n' http://github.com    # 타임아웃
+#
+#   cilium fqdn cache list        # (cilium-agent 파드 안에서) 학습된 DNS -> IP 캐시
+#   hubble observe --pod tiefighter --protocol dns -f
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: fqdn-egress
+spec:
+  description: "egress - DNS 는 kube-dns 로만, 외부는 example.com 만"
+  endpointSelector:
+    matchLabels:
+      class: tiefighter
+  egress:
+    # 1) DNS 질의를 kube-dns 로만 보내고, 그 응답을 Cilium 이 들여다본다(L7 DNS).
+    - toEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: ANY
+          rules:
+            dns:
+              - matchPattern: "*"
+    # 2) 위에서 학습한 이름 중 example.com 계열만 나갈 수 있다.
+    - toFQDNs:
+        - matchName: "example.com"
+        - matchPattern: "*.example.com"
+      toPorts:
+        - ports:
+            - port: "80"
+              protocol: TCP
+            - port: "443"
+              protocol: TCP
+    # 3) 클러스터 내부 통신은 계속 허용 (데스스타 접근 유지)
+    - toEndpoints:
+        - matchLabels:
+            org: empire

@@ -1,0 +1,38 @@
+# 실습 2: L7 HTTP 정책 - "착륙 요청은 허용, 배기구는 금지"
+#
+# L4 까지는 BPF 프로그램이 직접 판단한다. 하지만 HTTP 메서드/경로 판단은
+# BPF 만으로 하지 않는다. Cilium 은 해당 트래픽을 파드 내부의 Envoy 프록시로
+# 리다이렉트해서 검사한 뒤 통과시킨다. 즉 L7 정책을 켜는 순간
+# "그 포트의 트래픽만" 프록시를 타므로 지연이 조금 늘어난다. 실무에서
+# L7 정책 범위를 좁게 잡아야 하는 이유다.
+#
+#   kubectl apply -f cilium/policies/02-l7-http.yaml
+#   kubectl exec tiefighter -- curl -s -XPOST deathstar.default.svc.cluster.local/v1/request-landing
+#     -> Ship landed
+#   kubectl exec tiefighter -- curl -s -XPUT  deathstar.default.svc.cluster.local/v1/exhaust-port
+#     -> Access denied  (403, BPF 가 아니라 Envoy 가 만든 응답)
+#
+#   hubble observe --pod tiefighter --protocol http -f
+#     -> http-request / http-response 이벤트가 보인다 (L4 만이면 안 보인다)
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: rule1
+spec:
+  description: "L7 - POST /v1/request-landing 만 허용"
+  endpointSelector:
+    matchLabels:
+      org: empire
+      class: deathstar
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            org: empire
+      toPorts:
+        - ports:
+            - port: "80"
+              protocol: TCP
+          rules:
+            http:
+              - method: "POST"
+                path: "/v1/request-landing"

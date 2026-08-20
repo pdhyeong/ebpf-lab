@@ -1,0 +1,66 @@
+name: ebpf-lab
+
+services:
+  lab:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: ebpf-lab:latest
+    container_name: ebpf-lab
+    hostname: ebpf-lab
+
+    # eBPF 로딩/어태치에 필요한 권한.
+    # 학습용이므로 privileged 로 단순화했다. 최소 권한으로 줄이고 싶으면
+    # privileged 를 지우고 아래 cap_add 주석을 풀면 대부분의 예제가 동작한다.
+    privileged: true
+    # cap_add: [BPF, PERFMON, NET_ADMIN, SYS_RESOURCE, SYS_PTRACE]
+
+    # 호스트(=linuxkit VM) PID 네임스페이스를 공유해서 다른 컨테이너의
+    # 프로세스까지 트레이싱 대상으로 볼 수 있게 한다.
+    pid: host
+
+    # cgroup 네임스페이스도 호스트와 공유한다. 이게 없으면 /sys/fs/cgroup 에
+    # 자기 자신의 cgroup 만 보여서, 07번 예제의 "cgroup id -> 컨테이너" 매핑이
+    # 다른 컨테이너를 찾지 못한다.
+    cgroup: host
+
+    security_opt:
+      - seccomp:unconfined
+      - apparmor:unconfined
+
+    ulimits:
+      memlock: -1
+
+    volumes:
+      - .:/lab                                  # 소스는 호스트에서 편집, 실행은 컨테이너에서
+      - /sys/kernel/debug:/sys/kernel/debug:rw  # tracefs (kprobe_events, trace_pipe)
+      - /sys/fs/bpf:/sys/fs/bpf:rw              # BPF 오브젝트 pinning
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw        # cgroup id -> 컨테이너 귀속 (07번)
+      # 컨테이너 "이름"은 커널에 없다. 런타임에 물어봐야 알 수 있어서 소켓을
+      # 읽기 전용으로 넣어 준다. (실무에서는 권한 범위를 반드시 검토할 부분)
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - go-build-cache:/root/.cache/go-build
+      - go-mod-cache:/go/pkg/mod
+
+    # 07번 예제의 Prometheus 엔드포인트를 macOS 에서 바로 열어보기 위한 포트
+    ports:
+      - "9101:9101"
+
+    environment:
+      - TERM=xterm-256color
+
+    working_dir: /lab
+    stdin_open: true
+    tty: true
+    command: ["sleep", "infinity"]
+
+  # 트레이싱 대상으로 쓸 별도 컨테이너 (execve / openat / tcp connect 발생시키기 용)
+  victim:
+    image: alpine:3.20
+    container_name: ebpf-victim
+    hostname: victim
+    command: ["sh", "-c", "while :; do wget -q -O- http://example.com >/dev/null 2>&1; sleep 3; done"]
+
+volumes:
+  go-build-cache:
+  go-mod-cache:

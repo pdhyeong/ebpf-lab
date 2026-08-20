@@ -1,0 +1,16 @@
+# bpf2go 산출물 (make generate 로 언제든 재생성)
+*_bpfel.go
+*_bpfeb.go
+*_bpfel.o
+*_bpfeb.o
+*.gen-stamp
+
+# bpftool 로 뽑는 커널 타입 헤더 (make vmlinux)
+include/vmlinux.h
+
+# 빌드 결과물
+/bin/
+cilium/.prev-context
+
+# 임시
+.scratch/

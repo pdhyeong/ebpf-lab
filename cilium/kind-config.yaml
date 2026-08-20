@@ -1,0 +1,25 @@
+# kind 클러스터 정의 - Cilium 을 CNI 로 쓰기 위한 설정
+#
+# disableDefaultCNI: kind 기본 CNI(kindnet)를 끈다. Cilium 이 들어올 자리를 비운다.
+# kubeProxyMode: none - kube-proxy(iptables) 대신 Cilium 의 eBPF 로드밸런서를 쓴다.
+#   이게 Cilium 을 배우는 핵심 포인트다. Service ClusterIP 변환이 iptables 규칙이
+#   아니라 BPF 맵 조회로 바뀐다. (bpftool map dump / cilium bpf lb list 로 확인)
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: cilium-lab
+
+networking:
+  disableDefaultCNI: true
+  kubeProxyMode: none
+  # 파드/서비스 CIDR 는 기본값을 그대로 쓴다 (10.244.0.0/16, 10.96.0.0/16)
+
+nodes:
+  - role: control-plane
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
+  - role: worker
+  - role: worker

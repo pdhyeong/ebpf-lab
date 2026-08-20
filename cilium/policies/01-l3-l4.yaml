@@ -1,0 +1,34 @@
+# 실습 1: L3/L4 정책 - "제국 소속만 데스스타 80 포트에 접근"
+#
+# 적용 전:  xwing 도 tiefighter 도 착륙 요청이 성공한다
+# 적용 후:  xwing 은 타임아웃 (드롭), tiefighter 만 성공
+#
+#   kubectl apply -f cilium/policies/01-l3-l4.yaml
+#   kubectl exec xwing      -- curl -s -m 3 -XPOST deathstar.default.svc.cluster.local/v1/request-landing
+#   kubectl exec tiefighter -- curl -s -m 3 -XPOST deathstar.default.svc.cluster.local/v1/request-landing
+#
+# 드롭이 어디서 일어났는지 보기:
+#   hubble observe --verdict DROPPED -f
+#
+# 여기서 봐야 할 것: IP 대역이 아니라 라벨(org=empire)로 정책을 쓴다.
+# 파드가 재시작되어 IP 가 바뀌어도 정책은 그대로다. iptables 기반 구현이면
+# IP 가 바뀔 때마다 규칙을 다시 써야 한다 -- Cilium 은 라벨 -> identity(숫자) 로
+# 매핑한 뒤 그 identity 를 BPF 맵에 넣는다. (cilium identity list 로 확인)
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: rule1
+spec:
+  description: "L3/L4 - 제국 소속만 데스스타 TCP 80 허용"
+  endpointSelector:
+    matchLabels:
+      org: empire
+      class: deathstar
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            org: empire
+      toPorts:
+        - ports:
+            - port: "80"
+              protocol: TCP
