@@ -1,0 +1,950 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>제품으로 조립하기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&family=IBM+Plex+Serif:wght@600&display=swap">
+<style>
+  /* 단독 파일로 열 때를 위한 최소 리셋 (아티팩트 뷰어가 넣어주던 것) */
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; }
+  img, svg, video { max-width: 100%; height: auto; }
+  *, *::before, *::after { box-sizing: border-box; }
+</style>
+<style>
+  :root {
+    --ground: #F4F5F7;
+    --surface: #FFFFFF;
+    --surface-2: #EDEFF3;
+    --ink: #171A21;
+    --ink-2: #3B424F;
+    --muted: #646C7B;
+    --rule: #DBDFE6;
+    --rule-soft: #E8EBF0;
+    --kernel: #2E4BB5;
+    --kernel-bg: #E9EDFB;
+    --user: #A85A15;
+    --user-bg: #FBEFE1;
+    --ok: #2C7A55;
+    --ok-bg: #E4F2EB;
+    --warn-bg: #FBEDE9;
+    --warn: #A83E22;
+    --code-bg: #F0F2F6;
+    --shadow: 0 1px 2px rgba(23,26,33,.05), 0 8px 24px -16px rgba(23,26,33,.25);
+
+    --f-sans: 'IBM Plex Sans KR', 'Apple SD Gothic Neo', system-ui, -apple-system, sans-serif;
+    --f-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, SFMono-Regular, Menlo, monospace;
+    --f-serif: 'IBM Plex Serif', 'Apple SD Gothic Neo', Georgia, serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #101319;
+      --surface: #171B23;
+      --surface-2: #1D222C;
+      --ink: #E4E7EC;
+      --ink-2: #C2C8D2;
+      --muted: #8E97A6;
+      --rule: #262C38;
+      --rule-soft: #202632;
+      --kernel: #8FA4F2;
+      --kernel-bg: #1A2140;
+      --user: #E2A05C;
+      --user-bg: #302213;
+      --ok: #5CC191;
+      --ok-bg: #12291F;
+      --warn-bg: #2E1A16;
+      --warn: #E88F72;
+      --code-bg: #12161D;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px -18px rgba(0,0,0,.9);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #101319;
+    --surface: #171B23;
+    --surface-2: #1D222C;
+    --ink: #E4E7EC;
+    --ink-2: #C2C8D2;
+    --muted: #8E97A6;
+    --rule: #262C38;
+    --rule-soft: #202632;
+    --kernel: #8FA4F2;
+    --kernel-bg: #1A2140;
+    --user: #E2A05C;
+    --user-bg: #302213;
+    --ok: #5CC191;
+    --ok-bg: #12291F;
+    --warn-bg: #2E1A16;
+    --warn: #E88F72;
+    --code-bg: #12161D;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px -18px rgba(0,0,0,.9);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--f-sans);
+    font-weight: 400;
+    font-size: 16px;
+    line-height: 1.75;
+    -webkit-font-smoothing: antialiased;
+    word-break: keep-all;
+  }
+
+  .page {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 0 24px 96px;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0 40px;
+  }
+  .rail { display: none; }
+  @media (min-width: 1000px) {
+    .page { grid-template-columns: 160px minmax(0, 1fr); }
+    .rail { display: block; }
+  }
+
+  /* ---------------- masthead ---------------- */
+  .masthead {
+    grid-column: 1 / -1;
+    padding: 72px 0 40px;
+    border-bottom: 1px solid var(--rule);
+    margin-bottom: 48px;
+  }
+  .eyebrow {
+    font-family: var(--f-mono);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 18px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+  }
+  .eyebrow .sep { color: var(--rule); }
+  h1 {
+    font-family: var(--f-sans);
+    font-size: clamp(34px, 6vw, 52px);
+    font-weight: 700;
+    letter-spacing: -.02em;
+    line-height: 1.15;
+    margin: 0 0 20px;
+    text-wrap: balance;
+  }
+  .standfirst {
+    font-size: clamp(17px, 2.2vw, 19px);
+    color: var(--ink-2);
+    font-weight: 300;
+    max-width: none;
+    margin: 0;
+  }
+  .standfirst strong { font-weight: 600; color: var(--ink); }
+
+  /* ---------------- rail ---------------- */
+  .rail nav {
+    position: sticky;
+    top: 32px;
+    font-family: var(--f-mono);
+    font-size: 12.5px;
+    line-height: 1.5;
+    border-left: 1px solid var(--rule);
+    padding-left: 0;
+  }
+  .rail a {
+    display: flex;
+    gap: 10px;
+    padding: 7px 0 7px 14px;
+    color: var(--muted);
+    text-decoration: none;
+    border-left: 2px solid transparent;
+    margin-left: -1px;
+    transition: color .15s, border-color .15s;
+  }
+  .rail a:hover, .rail a:focus-visible { color: var(--ink); border-left-color: var(--kernel); }
+  .rail a .n { color: var(--rule); }
+  .rail a:hover .n { color: var(--kernel); }
+
+  /* ---------------- content ---------------- */
+  main { min-width: 0; max-width: 720px; margin-inline: auto; }
+  section { margin-bottom: 72px; scroll-margin-top: 24px; }
+  .prose { max-width: none; }
+
+  h2 {
+    font-size: clamp(24px, 3.4vw, 31px);
+    font-weight: 600;
+    letter-spacing: -.015em;
+    line-height: 1.25;
+    margin: 0 0 8px;
+    text-wrap: balance;
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+  }
+  h2 .stage {
+    font-family: var(--f-serif);
+    font-weight: 600;
+    font-size: .72em;
+    color: var(--kernel);
+    font-variant-numeric: tabular-nums;
+    flex: none;
+  }
+  .h2-sub {
+    color: var(--muted);
+    font-size: 15px;
+    margin: 0 0 32px 0;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--rule-soft);
+    max-width: none;
+  }
+  h3 {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -.01em;
+    margin: 40px 0 12px;
+    text-wrap: balance;
+  }
+  h4 {
+    font-family: var(--f-mono);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 32px 0 10px;
+  }
+  p { margin: 0 0 16px; max-width: none; }
+  ul, ol { margin: 0 0 16px; padding-left: 22px; max-width: none; }
+  li { margin-bottom: 8px; }
+  li::marker { color: var(--muted); }
+  strong { font-weight: 600; }
+  a { color: var(--kernel); }
+
+  code {
+    font-family: var(--f-mono);
+    font-size: .875em;
+    background: var(--code-bg);
+    border: 1px solid var(--rule-soft);
+    border-radius: 3px;
+    padding: .1em .35em;
+    word-break: break-word;
+  }
+  pre {
+    font-family: var(--f-mono);
+    background: var(--code-bg);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 18px 20px;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.65;
+    margin: 0 0 20px;
+    tab-size: 4;
+  }
+  pre code { background: none; border: 0; padding: 0; font-size: inherit; }
+  pre .c { color: var(--muted); }
+  pre .k { color: var(--kernel); font-weight: 500; }
+  pre .u { color: var(--user); font-weight: 500; }
+  pre .hl { color: var(--warn); font-weight: 500; }
+
+  figure { margin: 28px 0 32px; }
+  figure svg { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+  figcaption {
+    font-size: 13.5px;
+    color: var(--muted);
+    margin-top: 14px;
+    text-align: left;
+    max-width: none;
+    line-height: 1.6;
+  }
+  .figframe {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 24px 20px;
+    overflow-x: auto;
+    box-shadow: var(--shadow);
+  }
+
+  /* tables */
+  .tablewrap { overflow-x: auto; margin: 0 0 24px; border: 1px solid var(--rule); border-radius: 8px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; min-width: 460px; }
+  th, td { text-align: left; padding: 11px 16px; border-bottom: 1px solid var(--rule-soft); vertical-align: top; }
+  thead th {
+    font-family: var(--f-mono);
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--rule);
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+  td.mono, th.mono, .num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; font-size: 13px; }
+
+  /* callouts */
+  .note {
+    border-left: 3px solid var(--kernel);
+    background: var(--surface);
+    border-radius: 0 6px 6px 0;
+    padding: 16px 20px;
+    margin: 24px 0;
+    max-width: none;
+  }
+  .note.trap { border-left-color: var(--warn); }
+  .note.frida { border-left-color: var(--user); }
+  .note > :last-child { margin-bottom: 0; }
+  .note .label {
+    font-family: var(--f-mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--kernel);
+    display: block;
+    margin-bottom: 6px;
+  }
+  .note.trap .label { color: var(--warn); }
+  .note.frida .label { color: var(--user); }
+
+  .tag {
+    font-family: var(--f-mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: .06em;
+    padding: 2px 8px;
+    border-radius: 100px;
+    white-space: nowrap;
+  }
+  .tag.k { color: var(--kernel); background: var(--kernel-bg); }
+  .tag.u { color: var(--user); background: var(--user-bg); }
+
+  .split { display: grid; gap: 20px; margin: 24px 0; }
+  @media (min-width: 720px) { .split.two { grid-template-columns: 1fr 1fr; } }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 20px 22px;
+    box-shadow: var(--shadow);
+  }
+  .card h4 { margin-top: 0; }
+  .card > :last-child { margin-bottom: 0; }
+  .card p, .card ul { max-width: none; }
+
+  .lv {
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    background: var(--surface);
+    padding: 20px 22px;
+    margin-bottom: 16px;
+    box-shadow: var(--shadow);
+  }
+  .lv > :last-child { margin-bottom: 0; }
+  .lv-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+  .lv-num {
+    font-family: var(--f-mono);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    color: var(--user);
+    background: var(--user-bg);
+    padding: 3px 9px;
+    border-radius: 4px;
+  }
+  .lv-title { font-weight: 600; font-size: 16.5px; }
+  .lv p, .lv ul { max-width: none; }
+
+  .steps { counter-reset: step; list-style: none; padding: 0; max-width: none; }
+  .steps > li {
+    counter-increment: step;
+    position: relative;
+    padding-left: 44px;
+    margin-bottom: 28px;
+  }
+  .steps > li::before {
+    content: counter(step);
+    position: absolute;
+    left: 0;
+    top: 1px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--kernel-bg);
+    color: var(--kernel);
+    font-family: var(--f-mono);
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .steps > li > :first-child { margin-top: 0; }
+
+  hr.rule { border: 0; border-top: 1px solid var(--rule); margin: 0 0 48px; }
+
+  .kv { font-family: var(--f-mono); font-size: 13px; }
+
+  :focus-visible { outline: 2px solid var(--kernel); outline-offset: 3px; border-radius: 2px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  /* ---------------- 퀴즈 ---------------- */
+  .quizmeta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 20px;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin: 0 0 28px;
+    box-shadow: var(--shadow);
+    position: sticky;
+    top: 12px;
+    z-index: 5;
+  }
+  .scoreline {
+    font-family: var(--f-mono);
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+  .scoreline b { color: var(--kernel); font-weight: 600; }
+  .scorebar {
+    flex: 1 1 120px;
+    height: 6px;
+    min-width: 100px;
+    border-radius: 100px;
+    background: var(--surface-2);
+    overflow: hidden;
+  }
+  .scorebar i { display: block; height: 100%; width: 0; background: var(--ok); transition: width .25s ease; }
+  .btn-reset {
+    font-family: var(--f-mono);
+    font-size: 11.5px;
+    letter-spacing: .06em;
+    color: var(--muted);
+    background: none;
+    border: 1px solid var(--rule);
+    border-radius: 5px;
+    padding: 5px 12px;
+    cursor: pointer;
+  }
+  .btn-reset:hover { color: var(--ink); border-color: var(--muted); }
+
+  .qgroup { margin: 36px 0 12px; }
+  .qgroup h3 { margin-top: 0; }
+
+  .q {
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--rule);
+    border-radius: 0 8px 8px 0;
+    background: var(--surface);
+    padding: 16px 20px;
+    margin-bottom: 12px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px 16px;
+    align-items: start;
+  }
+  .q .qtext { font-size: 15.5px; line-height: 1.6; }
+  .q .qnum {
+    font-family: var(--f-mono);
+    font-size: 11.5px;
+    color: var(--muted);
+    margin-right: 8px;
+    font-variant-numeric: tabular-nums;
+  }
+  .q .ox { display: flex; gap: 8px; }
+  .q .ox button {
+    font-family: var(--f-mono);
+    font-size: 15px;
+    font-weight: 600;
+    width: 42px;
+    height: 38px;
+    border-radius: 6px;
+    border: 1px solid var(--rule);
+    background: var(--surface-2);
+    color: var(--ink-2);
+    cursor: pointer;
+    transition: border-color .15s, color .15s, background .15s;
+  }
+  .q .ox button:hover:not(:disabled) { border-color: var(--kernel); color: var(--kernel); }
+  .q .ox button:disabled { cursor: default; opacity: .55; }
+  .q .ox button.right { border-color: var(--ok); color: var(--ok); background: var(--ok-bg); opacity: 1; }
+  .q .ox button.wrong { border-color: var(--warn); color: var(--warn); background: var(--warn-bg); opacity: 1; }
+  .q.ok { border-left-color: var(--ok); }
+  .q.no { border-left-color: var(--warn); }
+  .q .exp {
+    grid-column: 1 / -1;
+    font-size: 14px;
+    line-height: 1.65;
+    color: var(--ink-2);
+    border-top: 1px dashed var(--rule);
+    padding-top: 12px;
+    margin: 2px 0 0;
+  }
+  .q .exp[hidden] { display: none; }
+  .q .exp .verdict {
+    font-family: var(--f-mono);
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    display: block;
+    margin-bottom: 5px;
+  }
+  .q.ok .exp .verdict { color: var(--ok); }
+  .q.no .exp .verdict { color: var(--warn); }
+
+  details.fill {
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    background: var(--surface);
+    padding: 0;
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+  details.fill > summary {
+    cursor: pointer;
+    padding: 16px 20px;
+    font-size: 15.5px;
+    list-style: none;
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+  }
+  details.fill > summary::-webkit-details-marker { display: none; }
+  details.fill > summary::after {
+    content: "정답 보기";
+    margin-left: auto;
+    font-family: var(--f-mono);
+    font-size: 11px;
+    letter-spacing: .08em;
+    color: var(--muted);
+    white-space: nowrap;
+    align-self: center;
+  }
+  details.fill[open] > summary::after { content: "닫기"; }
+  details.fill > summary:hover { background: var(--surface-2); }
+  details.fill .ans {
+    padding: 0 20px 18px;
+    border-top: 1px dashed var(--rule);
+    margin-top: 4px;
+    padding-top: 14px;
+    font-size: 14px;
+    color: var(--ink-2);
+  }
+  details.fill .ans > :last-child { margin-bottom: 0; }
+  details.fill pre { margin-bottom: 10px; }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+<header class="masthead">
+  <p class="eyebrow"><span>ebpf-lab</span><span class="sep">/</span><span>예제 07</span><span class="sep">/</span><span>멀티 프로브 에이전트</span></p>
+  <h1>제품으로 조립하기</h1>
+  <p class="standfirst">01~06은 훅을 <strong>하나씩</strong> 배우는 랩이었다. 07번은 그것들을 <strong>하나의 에이전트로 조립</strong>한다 — 멀티 프로브, 커널 단계 필터, 런타임 설정, 유실 카운터, 컨테이너 귀속. Tetragon과 Falco가 실제로 하는 일의 축소판이다.</p>
+</header>
+
+<aside class="rail">
+  <nav aria-label="목차">
+    <a href="#s0"><span class="n">00</span><span>제품의 조건</span></a>
+    <a href="#s1"><span class="n">01</span><span>구조</span></a>
+    <a href="#s2"><span class="n">02</span><span>단계 공략</span></a>
+    <a href="#s3"><span class="n">03</span><span>운영</span></a>
+    <a href="#quiz"><span class="n">04</span><span>퀴즈</span></a>
+  </nav>
+</aside>
+
+<main>
+<section id="s0">
+  <h2><span class="stage">00</span>예제와 제품을 가르는 다섯 가지</h2>
+  <p class="h2-sub">기능이 되는 것과 믿고 쓸 수 있는 것은 다르다.</p>
+
+  <div class="prose">
+    <p>훅 하나를 붙이는 건 어렵지 않다. 그걸 <strong>프로덕션에 올릴 물건</strong>으로 만들 때 반드시 필요해지는 것들이 있다.</p>
+  </div>
+  <div class="split two">
+    <div class="card">
+      <h4>1 · 하나의 오브젝트, 여러 프로브</h4>
+      <p style="margin-bottom:0">프로브마다 맵과 링버퍼를 따로 만들면 메모리와 관리 비용이 폭발한다.
+      <strong>이벤트에 <code>kind</code>를 실어</strong> 하나의 링버퍼로 보낸다.</p>
+    </div>
+    <div class="card">
+      <h4>2 · 커널에서 미리 거른다</h4>
+      <p style="margin-bottom:0">유저 공간까지 올려서 버리면 그게 곧 오버헤드다. 그리고 <strong>자기 자신을 안 걸러내면</strong>
+      에이전트가 자기 로그를 보고 또 이벤트를 만드는 <strong>피드백 루프</strong>가 생긴다.</p>
+    </div>
+    <div class="card">
+      <h4>3 · 런타임 설정 맵</h4>
+      <p style="margin-bottom:0">재컴파일 없이 켜고 끈다. 실제 제품은 여기에 정책이 들어간다.
+      <strong>유저 → 커널 방향 통신도 결국 맵</strong>이다.</p>
+    </div>
+    <div class="card">
+      <h4>4 · 유실 카운터</h4>
+      <p style="margin-bottom:0">링버퍼가 꽉 차면 이벤트가 사라진다. <strong>몇 개 잃었는지 모르는 관측 시스템은
+      신뢰할 수 없다.</strong> 반드시 세어서 노출한다.</p>
+    </div>
+    <div class="card">
+      <h4>5 · cgroup id 로 귀속</h4>
+      <p style="margin-bottom:0">컨테이너/파드 단위로 묶는 <strong>유일하게 믿을 만한 키</strong>다.
+      PID는 네임스페이스마다 다르고 재사용된다. cgroup v2에서 cgroup id = 디렉터리 inode 번호다.</p>
+    </div>
+    <div class="card">
+      <h4>+ 컨테이너 이름은 커널에 없다</h4>
+      <p style="margin-bottom:0">커널은 cgroup id까지만 안다. "이게 <code>ebpf-victim</code>이다"는
+      <strong>런타임에 물어봐야</strong> 알 수 있어서 docker 소켓을 읽는다. 실무에서 권한 범위를 반드시 검토할 지점.</p>
+    </div>
+  </div>
+
+</section>
+
+<section id="s1">
+  <h2><span class="stage">01</span>구조</h2>
+  <p class="h2-sub">세 프로브 + 세 맵. 01~06에서 배운 게 전부 한 파일에 있다.</p>
+
+  <div class="prose">
+    <h3>프로브 세 개 — 훅 종류가 다 다르다</h3>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>이벤트</th><th>훅</th><th>배운 랩</th><th>경로 읽기</th></tr></thead>
+        <tbody>
+          <tr><td><strong>EXEC</strong></td><td class="mono">tracepoint/syscalls/sys_enter_execve</td><td>02</td><td class="mono">_user</td></tr>
+          <tr><td><strong>CONNECT</strong></td><td class="mono">fentry/tcp_connect</td><td>03</td><td>—</td></tr>
+          <tr><td><strong>UNLINK</strong></td><td class="mono">kprobe/do_unlinkat</td><td>01</td><td class="mono">_kernel</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      <strong>같은 "경로 읽기"인데 헬퍼가 다르다는 게 이 랩의 핵심 교훈 중 하나다.</strong>
+      execve는 시스템콜 진입 직후라 포인터가 아직 유저 공간이고, do_unlinkat은 이미 커널로 복사된 뒤다.
+    </p>
+    <h3>맵 세 개</h3>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th class="mono">맵</th><th>타입</th><th>방향</th><th>역할</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">events</td><td>RINGBUF (1MB)</td><td>커널 → 유저</td><td>이벤트 스트리밍</td></tr>
+          <tr><td class="mono">config_map</td><td>ARRAY</td><td><strong>유저 → 커널</strong></td><td>런타임 설정 주입</td></tr>
+          <tr><td class="mono">stats</td><td>PERCPU_ARRAY</td><td>커널 → 유저</td><td>종류별 카운트 + 유실 + 필터됨</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h3>EXEC 이벤트의 함정 하나</h3>
+    <div class="note trap" style="margin-top:12px">
+      <span class="label">comm 과 path 가 다른 프로세스를 가리킨다</span>
+      <p style="margin-bottom:0">
+        <code>sys_enter_execve</code> 시점에는 <strong>아직 새 이미지가 로드되지 않았다</strong>.
+        그래서 <code>comm</code>은 <em>실행을 요청한 쪽</em>(보통 셸)의 이름이고,
+        <code>path</code>가 <em>새로 실행될 파일</em>이다.
+        이 차이를 모르고 대시보드를 만들면 계속 헷갈린다.
+      </p>
+    </div>
+    <div class="prose"><h3>실행</h3></div>
+  </div>
+  <pre><code>make 07
+make 07 ARGS="-json"                       <span class="c"># JSON Lines 로그</span>
+make 07 ARGS="-container ebpf-victim"      <span class="c"># 특정 컨테이너만 (커널에서 필터)</span>
+make 07 ARGS="-metrics :9101"              <span class="c"># Prometheus — 맥에서 localhost:9101/metrics</span>
+make 07 ARGS="-pin"                        <span class="c"># 맵을 /sys/fs/bpf 에 pin</span>
+
+make 07-check</code></pre>
+
+</section>
+
+<section id="s2">
+  <h2><span class="stage">02</span>단계 공략</h2>
+  <p class="h2-sub">빈칸 4개. Lv1이 이 랩에서 가장 중요하다.</p>
+
+  <div class="lv">
+    <div class="lv-head"><span class="lv-num">LV 1 · 30점</span><span class="lv-title">커널 단계 필터</span></div>
+    <pre><code>if (kind == KIND_EXEC &amp;&amp; !cfg-&gt;want_exec)       return 0;
+if (kind == KIND_CONNECT &amp;&amp; !cfg-&gt;want_connect) return 0;
+if (kind == KIND_UNLINK &amp;&amp; !cfg-&gt;want_unlink)   return 0;
+
+__u32 tgid = bpf_get_current_pid_tgid() &gt;&gt; 32;
+if (tgid == cfg-&gt;self_pid) { bump(STAT_FILTERED); return 0; }   <span class="c">// 피드백 루프 차단</span>
+
+__u64 cgid = bpf_get_current_cgroup_id();
+if (cfg-&gt;cgroup_id != 0 &amp;&amp; cgid != cfg-&gt;cgroup_id) {
+        bump(STAT_FILTERED); return 0;
+}
+*cgid_out = cgid;
+return 1;</code></pre>
+    <p><strong>세 가지가 한 함수에 다 들어 있다:</strong></p>
+    <ul style="margin-bottom:0">
+      <li><strong>런타임 설정</strong> — 재컴파일 없이 프로브를 켜고 끈다. 유저 공간이 로드 직후 <code>config_map</code>에 써 넣는다.</li>
+      <li><strong>자기 자신 차단</strong> — 이게 없으면 에이전트가 로그 파일을 열고, 그 <code>openat</code>이 이벤트가 되고,
+        그걸 기록하려고 또 파일을 열고… <strong>무한 증폭</strong>된다. 실제로 겪어보면 잊지 못한다.</li>
+      <li><strong>범위 제한</strong> — cgroup id로 컨테이너 하나만 본다. <strong>버린 것도 <code>STAT_FILTERED</code>로 센다.</strong></li>
+    </ul>
+  </div>
+  <div class="lv">
+    <div class="lv-head"><span class="lv-num">LV 2 · 25점</span><span class="lv-title">UID와 부모 PID</span></div>
+    <pre><code>e-&gt;uid = (__u32)bpf_get_current_uid_gid();
+
+<span class="c">/* 부모 PID 는 헬퍼가 없다. task_struct 를 CO-RE 로 타고 들어간다 */</span>
+struct task_struct *task = (struct task_struct *)bpf_get_current_task();
+e-&gt;ppid = BPF_CORE_READ(task, real_parent, tgid);</code></pre>
+    <p style="margin-bottom:0">
+      <strong><code>real_parent</code> vs <code>parent</code>:</strong> ptrace 중이면 <code>parent</code>가 디버거로 바뀐다.
+      프로세스 계보를 추적할 때는 <code>real_parent</code>가 맞다.
+      <strong>헬퍼가 없으면 구조체를 타고 들어간다</strong> — 이게 실무에서 계속 쓰는 패턴이고, CO-RE가 없으면 못 하는 일이다.
+    </p>
+  </div>
+  <div class="lv">
+    <div class="lv-head"><span class="lv-num">LV 3 · 20점</span><span class="lv-title">경로 읽기 — user와 kernel</span></div>
+    <pre><code><span class="c">/* EXEC: 시스템콜 진입 직후 → 유저 공간 포인터 */</span>
+const char *filename = (const char *)ctx-&gt;args[0];
+bpf_probe_read_user_str(&amp;e-&gt;path, sizeof(e-&gt;path), filename);
+
+<span class="c">/* UNLINK: 이미 커널로 복사된 뒤 → 커널 포인터 */</span>
+bpf_probe_read_kernel_str(&amp;e-&gt;path, sizeof(e-&gt;path), BPF_CORE_READ(name, name));</code></pre>
+    <p style="margin-bottom:0"><strong>한 파일 안에 둘 다 있다.</strong> 바꿔 쓰면 에러 없이 빈 문자열이 나온다.
+    "어느 쪽 메모리인가"를 판단하는 기준은 <strong>훅의 위치</strong>다 — 시스템콜 경계를 넘기 전인가 후인가.</p>
+  </div>
+  <div class="lv">
+    <div class="lv-head"><span class="lv-num">LV 4 · 10점</span><span class="lv-title">유실 카운터 (보너스)</span></div>
+    <pre><code>e = bpf_ringbuf_reserve(&amp;events, sizeof(*e), 0);
+if (!e) {
+        bump(STAT_DROPPED);   <span class="c">// ← 이 한 줄</span>
+        return 0;
+}</code></pre>
+    <p style="margin-bottom:0">
+      세 프로브 전부에 넣는다. 종료 시 <code>main.go</code>가 <strong>유실=N</strong>을 빨간색으로 출력한다.
+      유실이 보이면 링버퍼를 키우거나(<code>1&lt;&lt;20</code> → <code>1&lt;&lt;22</code>) 커널 필터를 더 좁혀야 한다.
+      <strong>"모르는 것"과 "0인 것"을 구분할 수 있게 만드는 것</strong>이 관측 시스템의 최소 조건이다.
+    </p>
+  </div>
+
+</section>
+
+<section id="s3">
+  <h2><span class="stage">03</span>운영 관점</h2>
+  <p class="h2-sub">pinning, 메트릭, 그리고 이 다음.</p>
+
+  <div class="prose">
+    <h3>pinning — 프로세스가 죽어도 남기기</h3>
+    <p>
+      지금까지 모든 랩에서 <strong>Go 프로세스가 죽으면 맵과 프로그램도 사라졌다</strong>.
+      fd가 닫히면 커널 객체가 회수되기 때문이다. <code>-pin</code>을 주면 <code>/sys/fs/bpf</code>에
+      파일처럼 고정되어 살아남는다:
+    </p>
+  </div>
+  <pre><code>make 07 ARGS="-pin"
+
+<span class="c"># 실행 중에 다른 터미널에서 — 이게 pinning 의 실용성이다</span>
+make sh
+bpftool map dump pinned /sys/fs/bpf/ebpf-lab/stats</code></pre>
+  <div class="prose">
+    <p>
+      실무에서는 <strong>에이전트를 재시작해도 통계가 유지</strong>되거나, 별도 CLI가 같은 맵을 읽는 용도로 쓴다.
+      Cilium이 <code>/sys/fs/bpf/tc/globals/</code>에 수십 개 맵을 pin해 두는 것도 같은 이유다
+      (<code>make cilium-bpf</code>로 볼 수 있다).
+    </p>
+    <h3>Prometheus 메트릭</h3>
+  </div>
+  <pre><code>make 07 ARGS="-metrics :9101"
+<span class="c"># macOS 브라우저에서 http://localhost:9101/metrics</span></code></pre>
+  <div class="prose">
+    <p>
+      PERCPU 통계 맵을 주기적으로 읽어 메트릭으로 노출한다. <strong>유실 카운터를 반드시 메트릭에 포함</strong>시키는 게
+      실무 관례다 — 알림을 걸 대상이기 때문이다.
+    </p>
+    <h3>여기서 확장한다면</h3>
+    <ul>
+      <li><strong>정책 맵</strong> — 지금은 on/off뿐이다. "이 경로 접근만 알림" 같은 규칙을 LPM_TRIE나 HASH로 넣으면 Tetragon에 가까워진다.</li>
+      <li><strong>차단</strong> — 지금은 전부 관찰이다. LSM 훅(10·13번)으로 옮기면 <strong>-EPERM으로 막을 수 있다</strong>.</li>
+      <li><strong>이벤트 상관</strong> — EXEC → CONNECT → UNLINK를 PID로 엮으면 "이 프로세스가 뭘 했는가"의 서사가 만들어진다.</li>
+    </ul>
+    <h3>학습 트랙 완주</h3>
+    <p>
+      01~07을 다 통과했다면 <strong>eBPF의 기본기는 갖춘 것</strong>이다.
+      08~14 게임 트랙은 여기서 배운 것으로 <strong>변조·차단·탐지</strong>를 직접 구현한다 —
+      관찰에서 개입으로 넘어가는 단계다.
+    </p>
+  </div>
+
+</section>
+
+<section id="quiz">
+  <h2><span class="stage">04</span>퀴즈</h2>
+  <p class="h2-sub">O/X를 누르면 바로 채점되고 해설이 열린다. 틀린 문제의 해설이 진짜 공부다.</p>
+  <div class="quizmeta">
+    <span class="scoreline">점수 <b id="qscore">0</b> / <span id="qtotal">12</span></span>
+    <span class="scorebar"><i id="qbar"></i></span>
+    <span class="scoreline" id="qmsg" style="color:var(--muted)">아직 안 풀었다</span>
+    <button class="btn-reset" id="qreset" type="button">다시 풀기</button>
+  </div>
+  <div class="qgroup">
+    <h3>A. O / X</h3>
+<div class="q" data-a="X">
+  <div class="qtext"><span class="qnum">01</span>프로브마다 링버퍼를 따로 만드는 것이 하나로 합치는 것보다 효율적이다.</div>
+  <div class="ox"><button type="button" data-v="O">O</button><button type="button" data-v="X">X</button></div>
+  <p class="exp" hidden><span class="verdict"></span>정답 <strong>X</strong>. 맵마다 메모리가 미리 잡히고 관리 비용도 늘어난다. 이벤트에 <code>kind</code>를 실어 <strong>하나의 링버퍼</strong>로 보내는 게 실무 방식이다.</p>
+</div>
+
+<div class="q" data-a="O">
+  <div class="qtext"><span class="qnum">02</span>에이전트가 자기 자신의 PID를 걸러내지 않으면 이벤트가 무한 증폭될 수 있다.</div>
+  <div class="ox"><button type="button" data-v="O">O</button><button type="button" data-v="X">X</button></div>
+  <p class="exp" hidden><span class="verdict"></span>정답 <strong>O</strong>. 에이전트가 로그를 쓰고, 그 <code>openat</code>이 이벤트가 되고, 기록하려고 또 파일을 열고… 피드백 루프다. <code>self_pid</code> 필터가 이걸 막는다.</p>
+</div>
+
+<div class="q" data-a="O">
+  <div class="qtext"><span class="qnum">03</span>유저 공간에서 커널로 설정을 전달할 때도 결국 맵을 쓴다.</div>
+  <div class="ox"><button type="button" data-v="O">O</button><button type="button" data-v="X">X</button></div>
+  <p class="exp" hidden><span class="verdict"></span>정답 <strong>O</strong>. ARRAY 맵(<code>config_map</code>)에 유저 공간이 값을 쓰고 BPF 프로그램이 읽는다. 함수 호출 같은 건 없다.</p>
+</div>
+
+<div class="q" data-a="X">
+  <div class="qtext"><span class="qnum">04</span>링버퍼가 꽉 차서 이벤트가 사라져도, 유실 개수를 세지 않아도 큰 문제는 없다.</div>
+  <div class="ox"><button type="button" data-v="O">O</button><button type="button" data-v="X">X</button></div>
+  <p class="exp" hidden><span class="verdict"></span>정답 <strong>X</strong>. 몇 개 잃었는지 모르는 관측 시스템은 신뢰할 수 없다. "0인 것"과 "모르는 것"을 구분할 수 있어야 한다.</p>
+</div>
+
+<div class="q" data-a="O">
+  <div class="qtext"><span class="qnum">05</span>cgroup id는 컨테이너 단위로 이벤트를 귀속시키는 신뢰할 만한 키다.</div>
+  <div class="ox"><button type="button" data-v="O">O</button><button type="button" data-v="X">X</button></div>
+  <p class="exp" hidden><span class="verdict"></span>정답 <strong>O</strong>. PID는 네임스페이스마다 다르고 재사용된다. cgroup v2에서 cgroup id는 cgroup 디렉터리의 inode 번호다.</p>
+</div>
+
+<div class="q" data-a="X">
+  <div class="qtext"><span class="qnum">06</span>커널은 컨테이너의 <strong>이름</strong>을 알고 있다.</div>
+  <div class="ox"><button type="button" data-v="O">O</button><button type="button" data-v="X">X</button></div>
+  <p class="exp" hidden><span class="verdict"></span>정답 <strong>X</strong>. 커널에 컨테이너라는 개념이 없다. cgroup id까지만 안다. 이름은 런타임(docker 소켓 등)에 물어봐야 알 수 있다.</p>
+</div>
+
+<div class="q" data-a="X">
+  <div class="qtext"><span class="qnum">07</span><code>sys_enter_execve</code> 시점의 <code>comm</code>은 새로 실행될 프로그램의 이름이다.</div>
+  <div class="ox"><button type="button" data-v="O">O</button><button type="button" data-v="X">X</button></div>
+  <p class="exp" hidden><span class="verdict"></span>정답 <strong>X</strong>. 아직 새 이미지가 로드되기 전이라 <strong>실행을 요청한 쪽</strong>(보통 셸)의 이름이다. 새로 실행될 파일은 <code>path</code>에 있다.</p>
+</div>
+
+<div class="q" data-a="X">
+  <div class="qtext"><span class="qnum">08</span>부모 PID를 얻는 전용 헬퍼가 있다.</div>
+  <div class="ox"><button type="button" data-v="O">O</button><button type="button" data-v="X">X</button></div>
+  <p class="exp" hidden><span class="verdict"></span>정답 <strong>X</strong>. 없다. <code>bpf_get_current_task()</code>로 <code>task_struct</code>를 얻고 <code>BPF_CORE_READ(task, real_parent, tgid)</code>로 타고 들어가야 한다.</p>
+</div>
+
+<div class="q" data-a="O">
+  <div class="qtext"><span class="qnum">09</span>프로세스 계보를 추적할 때는 <code>parent</code>보다 <code>real_parent</code>가 맞다.</div>
+  <div class="ox"><button type="button" data-v="O">O</button><button type="button" data-v="X">X</button></div>
+  <p class="exp" hidden><span class="verdict"></span>정답 <strong>O</strong>. ptrace 중이면 <code>parent</code>가 디버거로 바뀐다. 실제 생성 관계는 <code>real_parent</code>다.</p>
+</div>
+
+<div class="q" data-a="X">
+  <div class="qtext"><span class="qnum">10</span>execve의 경로와 unlink의 경로는 같은 헬퍼로 읽으면 된다.</div>
+  <div class="ox"><button type="button" data-v="O">O</button><button type="button" data-v="X">X</button></div>
+  <p class="exp" hidden><span class="verdict"></span>정답 <strong>X</strong>. execve는 시스템콜 진입 직후라 <code>_user</code>, do_unlinkat은 이미 커널로 복사된 뒤라 <code>_kernel</code>이다. 바꿔 쓰면 에러 없이 빈 문자열이 나온다.</p>
+</div>
+
+<div class="q" data-a="O">
+  <div class="qtext"><span class="qnum">11</span>맵을 pin하면 Go 프로세스가 종료돼도 커널에 남는다.</div>
+  <div class="ox"><button type="button" data-v="O">O</button><button type="button" data-v="X">X</button></div>
+  <p class="exp" hidden><span class="verdict"></span>정답 <strong>O</strong>. <code>/sys/fs/bpf</code>에 파일처럼 고정된다. 에이전트 재시작 후에도 통계를 유지하거나 별도 CLI가 같은 맵을 읽는 데 쓴다.</p>
+</div>
+
+<div class="q" data-a="O">
+  <div class="qtext"><span class="qnum">12</span>이 예제는 이벤트를 관찰만 하고 차단은 하지 않는다.</div>
+  <div class="ox"><button type="button" data-v="O">O</button><button type="button" data-v="X">X</button></div>
+  <p class="exp" hidden><span class="verdict"></span>정답 <strong>O</strong>. tracepoint/fentry/kprobe는 전부 관찰용이다. 차단하려면 LSM 훅으로 옮겨 <code>-EPERM</code>을 반환해야 한다(10·13번).</p>
+</div>
+  </div>
+  <div class="qgroup">
+    <h3>B. 빈칸 채우기</h3>
+    <p style="color:var(--muted); font-size:14px; margin-bottom:16px">코드를 보지 않고 먼저 답해 보고, 눌러서 확인한다.</p>
+<details class="fill">
+  <summary><span class="qnum">C1</span><span>현재 프로세스가 속한 cgroup의 id를 얻는 헬퍼는?</span></summary>
+  <div class="ans"><pre><code>__u64 cgid = bpf_get_current_cgroup_id();</code></pre><p style="margin-bottom:0">컨테이너/파드 귀속의 유일하게 믿을 만한 키다. cgroup v2에서 이 값은 cgroup 디렉터리의 inode 번호다.</p></div>
+</details>
+
+<details class="fill">
+  <summary><span class="qnum">C2</span><span>부모 PID를 얻으려면?<br><code>struct task_struct *task = ______();</code></span></summary>
+  <div class="ans"><pre><code>struct task_struct *task = (struct task_struct *)bpf_get_current_task();
+e-&gt;ppid = BPF_CORE_READ(task, real_parent, tgid);</code></pre><p style="margin-bottom:0">헬퍼가 없을 때 구조체를 타고 들어가는 패턴이다. CO-RE가 없으면 커널마다 오프셋이 달라져 못 한다.</p></div>
+</details>
+
+<details class="fill">
+  <summary><span class="qnum">C3</span><span>pin한 맵을 유저 프로그램 없이 읽는 명령은?</span></summary>
+  <div class="ans"><pre><code>bpftool map dump pinned /sys/fs/bpf/ebpf-lab/stats</code></pre><p style="margin-bottom:0"><code>make 07 ARGS="-pin"</code>으로 실행한 뒤 다른 터미널에서. Cilium도 같은 방식으로 수십 개 맵을 pin해 둔다.</p></div>
+</details>
+  </div>
+</section>
+</main>
+</div>
+<script>
+(function () {
+  var qs = Array.prototype.slice.call(document.querySelectorAll('.q'));
+  var scoreEl = document.getElementById('qscore');
+  var totalEl = document.getElementById('qtotal');
+  var barEl = document.getElementById('qbar');
+  var msgEl = document.getElementById('qmsg');
+  var resetEl = document.getElementById('qreset');
+  if (!qs.length || !scoreEl) return;
+
+  totalEl.textContent = qs.length;
+
+  function update() {
+    var done = qs.filter(function (q) { return q.classList.contains('done'); }).length;
+    var ok = qs.filter(function (q) { return q.classList.contains('ok'); }).length;
+    scoreEl.textContent = ok;
+    barEl.style.width = (ok / qs.length * 100) + '%';
+    if (done === 0) { msgEl.textContent = '아직 안 풀었다'; return; }
+    if (done < qs.length) { msgEl.textContent = done + '문항 풀었다'; return; }
+    var pct = ok / qs.length;
+    msgEl.textContent = pct === 1 ? '전부 정답. 03번으로 가도 된다.'
+      : pct >= 0.8 ? '통과. 틀린 해설만 다시 읽어라.'
+      : pct >= 0.6 ? '아깝다. 틀린 절을 다시 보고 재도전.'
+      : '해당 절을 다시 읽고 오는 게 빠르다.';
+  }
+
+  qs.forEach(function (q) {
+    q.querySelectorAll('.ox button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (q.classList.contains('done')) return;
+        var right = q.dataset.a;
+        var correct = b.dataset.v === right;
+        q.classList.add('done', correct ? 'ok' : 'no');
+        q.querySelectorAll('.ox button').forEach(function (x) {
+          x.disabled = true;
+          if (x.dataset.v === right) x.classList.add('right');
+          else if (x === b) x.classList.add('wrong');
+        });
+        var exp = q.querySelector('.exp');
+        exp.hidden = false;
+        exp.querySelector('.verdict').textContent = correct ? '정답' : '오답';
+        update();
+      });
+    });
+  });
+
+  resetEl.addEventListener('click', function () {
+    qs.forEach(function (q) {
+      q.classList.remove('done', 'ok', 'no');
+      q.querySelector('.exp').hidden = true;
+      q.querySelectorAll('.ox button').forEach(function (x) {
+        x.disabled = false;
+        x.classList.remove('right', 'wrong');
+      });
+    });
+    update();
+    document.getElementById('s9').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
+  update();
+})();
+</script>
+</body>
+</html>

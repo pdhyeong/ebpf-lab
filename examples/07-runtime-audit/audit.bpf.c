@@ -19,6 +19,15 @@
  *   5) cgroup id 를 이벤트에 실어 보낸다
  *      -> 컨테이너/파드 단위로 귀속시키는 유일한 신뢰 가능한 키.
  *         cgroup v2 에서 cgroup id == cgroup 디렉터리의 inode 번호다
+ *
+ * ┌─ 진행 방법 ──────────────────────────────────────────────────────┐
+ * │  make 07          지금 상태로 실행 (아무 이벤트도 안 나온다)      │
+ * │  Lv1 → Lv2 → Lv3 순서로 TODO 를 채운다                            │
+ * │  make 07-check    단계별 자동 채점                                │
+ * │  막히면           solution/audit.bpf.c                            │
+ * │                                                                   │
+ * │  01~06 은 훅 하나씩이었다. 07 은 그걸 "제품"으로 조립하는 단계다.  │
+ * └──────────────────────────────────────────────────────────────────┘
  */
 
 #include "vmlinux.h"
@@ -109,27 +118,38 @@ static __always_inline int allowed(__u8 kind, __u64 *cgid_out)
 	if (!cfg)
 		return 0;
 
-	if (kind == KIND_EXEC && !cfg->want_exec)
-		return 0;
-	if (kind == KIND_CONNECT && !cfg->want_connect)
-		return 0;
-	if (kind == KIND_UNLINK && !cfg->want_unlink)
-		return 0;
+	/* ══════════════════════════════════════════════════════════════════
+	 * 🎯 Lv1 [30점] — 커널 단계 필터를 완성하라
+	 *
+	 *   실무 에이전트에서 가장 먼저 하는 일이 "안 볼 것을 커널에서 버리기"다.
+	 *   유저 공간까지 올려서 버리면 그게 곧 오버헤드고, 자기 자신을 안 걸러내면
+	 *   에이전트가 자기 로그를 보고 또 이벤트를 만드는 피드백 루프가 생긴다.
+	 *
+	 *   할 일 (1) 런타임 설정 반영 — 꺼진 종류는 버린다:
+	 *       if (kind == KIND_EXEC && !cfg->want_exec)       return 0;
+	 *       if (kind == KIND_CONNECT && !cfg->want_connect) return 0;
+	 *       if (kind == KIND_UNLINK && !cfg->want_unlink)   return 0;
+	 *
+	 *   할 일 (2) 자기 자신 차단 (피드백 루프 방지):
+	 *       __u32 tgid = bpf_get_current_pid_tgid() >> 32;
+	 *       if (tgid == cfg->self_pid) { bump(STAT_FILTERED); return 0; }
+	 *
+	 *   할 일 (3) cgroup 범위 제한 + 통과:
+	 *       __u64 cgid = bpf_get_current_cgroup_id();
+	 *       if (cfg->cgroup_id != 0 && cgid != cfg->cgroup_id) {
+	 *               bump(STAT_FILTERED); return 0;
+	 *       }
+	 *       *cgid_out = cgid;
+	 *       return 1;
+	 *
+	 *   ✅ 통과 조건: EXEC 이벤트가 화면에 찍힌다
+	 *   💡 cgroup id 는 컨테이너/파드에 귀속시키는 유일하게 믿을 만한 키다.
+	 *      PID 는 네임스페이스마다 다르고 재사용된다.
+	 * ══════════════════════════════════════════════════════════════════ */
+	/* TODO(Lv1) */
 
-	__u32 tgid = bpf_get_current_pid_tgid() >> 32;
-	if (tgid == cfg->self_pid) {
-		bump(STAT_FILTERED);
-		return 0;
-	}
-
-	__u64 cgid = bpf_get_current_cgroup_id();
-	if (cfg->cgroup_id != 0 && cgid != cfg->cgroup_id) {
-		bump(STAT_FILTERED);
-		return 0;
-	}
-
-	*cgid_out = cgid;
-	return 1;
+	*cgid_out = 0;
+	return 0; /* TODO(Lv1): 필터를 통과하면 1 을 돌려줘야 이벤트가 나간다 */
 }
 
 static __always_inline void fill_common(struct event *e, __u8 kind, __u64 cgid)
@@ -140,7 +160,7 @@ static __always_inline void fill_common(struct event *e, __u8 kind, __u64 cgid)
 	e->cgroup_id = cgid;
 	e->tgid = id >> 32;
 	e->pid = (__u32)id;
-	e->uid = (__u32)bpf_get_current_uid_gid();
+	e->uid = 0; /* TODO(Lv2) */
 	e->kind = kind;
 	e->pad = 0;
 	e->daddr = 0;
@@ -148,9 +168,23 @@ static __always_inline void fill_common(struct event *e, __u8 kind, __u64 cgid)
 	e->path[0] = 0;
 	bpf_get_current_comm(&e->comm, sizeof(e->comm));
 
-	/* 부모 PID 는 헬퍼가 없어서 task_struct 를 CO-RE 로 타고 들어가야 한다. */
-	struct task_struct *task = (struct task_struct *)bpf_get_current_task();
-	e->ppid = BPF_CORE_READ(task, real_parent, tgid);
+	/* ══════════════════════════════════════════════════════════════════
+	 * 🎯 Lv2 [25점] — UID 와 부모 PID 를 채워라
+	 *
+	 *   UID 는 헬퍼가 있다:
+	 *       e->uid = (__u32)bpf_get_current_uid_gid();
+	 *
+	 *   부모 PID 는 헬퍼가 없다. task_struct 를 CO-RE 로 타고 들어가야 한다:
+	 *       struct task_struct *task = (struct task_struct *)bpf_get_current_task();
+	 *       e->ppid = BPF_CORE_READ(task, real_parent, tgid);
+	 *
+	 *   ✅ 통과 조건: PPID 칸이 0 이 아닌 실제 부모 PID 로 찍힌다
+	 *   💡 real_parent vs parent: ptrace 중이면 parent 가 디버거로 바뀐다.
+	 *      프로세스 계보를 추적할 때는 real_parent 가 맞다.
+	 *   💡 BPF_CORE_READ 는 -> 를 연쇄로 따라가며 각 단계에 재배치를 건다.
+	 *      task->real_parent->tgid 로 직접 쓰면 오프셋이 박혀 버린다.
+	 * ══════════════════════════════════════════════════════════════════ */
+	e->ppid = 0; /* TODO(Lv2) */
 }
 
 /* ---------------------------------------------------------------- EXEC
@@ -167,15 +201,23 @@ int trace_execve(struct trace_event_raw_sys_enter *ctx)
 
 	struct event *e = bpf_ringbuf_reserve(&events, sizeof(*e), 0);
 	if (!e) {
-		bump(STAT_DROPPED);
+		/* TODO(Lv4 보너스): bump(STAT_DROPPED); */
 		return 0;
 	}
 
 	fill_common(e, KIND_EXEC, cgid);
 
-	/* args[0] 은 유저 공간 포인터다. 커널 포인터용 헬퍼를 쓰면 실패한다. */
-	const char *filename = (const char *)ctx->args[0];
-	bpf_probe_read_user_str(&e->path, sizeof(e->path), filename);
+	/* ══════════════════════════════════════════════════════════════════
+	 * 🎯 Lv3 [20점] (1/2) — 실행 파일 경로를 읽어라
+	 *
+	 *   execve 의 args[0] 은 아직 유저 공간 포인터다. 커널용 헬퍼를 쓰면
+	 *   에러도 안 나고 조용히 빈 문자열이 나온다 — 제일 찾기 어려운 버그다.
+	 *
+	 *   할 일:
+	 *       const char *filename = (const char *)ctx->args[0];
+	 *       bpf_probe_read_user_str(&e->path, sizeof(e->path), filename);
+	 * ══════════════════════════════════════════════════════════════════ */
+	/* TODO(Lv3) */
 
 	bump(STAT_EXEC);
 	bpf_ringbuf_submit(e, 0);
@@ -195,7 +237,7 @@ int BPF_PROG(trace_tcp_connect, struct sock *sk)
 
 	struct event *e = bpf_ringbuf_reserve(&events, sizeof(*e), 0);
 	if (!e) {
-		bump(STAT_DROPPED);
+		/* TODO(Lv4 보너스): bump(STAT_DROPPED); */
 		return 0;
 	}
 
@@ -218,14 +260,39 @@ int BPF_KPROBE(trace_unlinkat, int dfd, struct filename *name)
 
 	struct event *e = bpf_ringbuf_reserve(&events, sizeof(*e), 0);
 	if (!e) {
-		bump(STAT_DROPPED);
+		/* TODO(Lv4 보너스): bump(STAT_DROPPED); */
 		return 0;
 	}
 
 	fill_common(e, KIND_UNLINK, cgid);
-	bpf_probe_read_kernel_str(&e->path, sizeof(e->path), BPF_CORE_READ(name, name));
+	/* ══════════════════════════════════════════════════════════════════
+	 * 🎯 Lv3 [20점] (2/2) — 삭제 경로를 읽어라
+	 *
+	 *   여기는 do_unlinkat 이라 경로가 이미 커널로 복사된 뒤다.
+	 *   같은 "경로 읽기"인데 헬퍼가 다르다는 걸 확인하는 게 이 단계의 목적이다.
+	 *
+	 *   할 일:
+	 *       bpf_probe_read_kernel_str(&e->path, sizeof(e->path),
+	 *                                 BPF_CORE_READ(name, name));
+	 *
+	 *   ✅ 통과 조건: UNLINK 행의 DETAIL 에 삭제한 실제 경로가 찍힌다
+	 * ══════════════════════════════════════════════════════════════════ */
+	/* TODO(Lv3) */
 
 	bump(STAT_UNLINK);
 	bpf_ringbuf_submit(e, 0);
 	return 0;
 }
+
+/*
+ * 🏆 Lv4 [10점] — 유실을 세어라 (보너스)
+ *
+ *   링버퍼가 꽉 차면 bpf_ringbuf_reserve() 가 NULL 을 돌려주고 이벤트가 사라진다.
+ *   "몇 개 잃었는지 모르는 관측 시스템"은 신뢰할 수 없다.
+ *
+ *   할 일: 세 프로브 각각에서 reserve 실패 시 bump(STAT_DROPPED); 를 부른다.
+ *
+ *   ✅ 통과 조건: 소스의 reserve 실패 경로에 bump(STAT_DROPPED) 가 있다
+ *   💡 종료 시 main.go 가 "유실=N" 을 빨간색으로 출력한다. 유실이 보이면
+ *      링버퍼를 키우거나(1<<20 -> 1<<22) 커널 필터를 더 좁혀야 한다.
+ */

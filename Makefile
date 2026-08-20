@@ -143,7 +143,8 @@ list: ## 예제 목록
 	@printf '  \033[35m13\033[0m  미니백신 게임 시그니처 파일 격리 (LSM, 챌린지)\n'
 	@printf '  \033[35m14\033[0m  IDS/IPS 게임  페이로드 시그니처 탐지·차단 (챌린지)\n'
 	@printf '\n  실행:  make 01   (make 07 ARGS="-metrics :9101" 처럼 인자 전달 가능)\n'
-	@printf '  게임(08~14):  빈칸을 채우고  make NN-check  로 채점 (점수제)\n\n'
+	@printf '  \033[1m전 랩 공통:\033[0m  .bpf.c 의 TODO 를 Lv1 부터 채우고  \033[36mmake NN-check\033[0m  로 채점 (70점 통과)\n'
+	@printf '  통과 후:  \033[36mopen examples/NN-*/STUDY.html\033[0m  (이론 + 동작 해부 + OX 퀴즈)\n\n'
 
 ARGS ?=
 
@@ -182,7 +183,43 @@ workload-stop: ## uprobe 타깃 종료
 	@$(ENSURE)
 	$(RUN) go run ./examples/07-runtime-audit $(ARGS)
 
-.PHONY: 05-check 08 09 10 11 12 13 14 game 05-check 09-check 10-check 11-check 12-check 13-check 14-check
+# ---------------------------------------------------------------- 학습 트랙 채점
+# 01~07 도 08~14 와 동일한 "빈칸 -> 채점" 방식이다.
+#   make NN        예제 실행 (빈칸 상태면 결과가 안 나온다)
+#   make NN-check  단계별 자동 채점 (Lv0 빌드 -> Lv1 -> Lv2 -> ... 순차 통과)
+#   막히면         examples/NN-*/solution/ 참고
+.PHONY: 01-check 02-check 03-check 04-check 06-check 07-check
+01-check: ## 01번 자동 채점 (kprobe 단계별)
+	@$(ENSURE)
+	$(RUN) bash examples/01-kprobe-unlink/check.sh
+
+02-check: ## 02번 자동 채점 (tracepoint 단계별)
+	@$(ENSURE)
+	$(RUN) bash examples/02-tracepoint-openat/check.sh
+
+03-check: ## 03번 자동 채점 (fentry/fexit 단계별)
+	@$(ENSURE)
+	$(RUN) bash examples/03-fentry-tcpconnect/check.sh
+
+04-check: ## 04번 자동 채점 (uprobe 단계별)
+	@$(ENSURE)
+	$(RUN) bash examples/04-uprobe-go/check.sh
+
+06-check: ## 06번 자동 채점 (TCX 단계별)
+	@$(ENSURE)
+	$(RUN) bash examples/06-tcx-egress/check.sh
+
+07-check: ## 07번 자동 채점 (런타임 감시 에이전트 단계별)
+	@$(ENSURE)
+	$(RUN) bash examples/07-runtime-audit/check.sh
+
+.PHONY: study
+study: ## 각 예제의 STUDY.html 위치 안내 (이론 + OX 퀴즈)
+	@printf '\n\033[1m학습 문서 (이론 + 동작 해부 + OX 퀴즈)\033[0m\n\n'
+	@ls examples/*/STUDY.html 2>/dev/null | sed 's|^|  open |' || echo '  (아직 없다)'
+	@printf '\n  macOS 에서 바로 열기:  open examples/01-kprobe-unlink/STUDY.html\n\n'
+
+.PHONY: 05-check 08 09 10 11 12 13 14 game 09-check 10-check 11-check 12-check 13-check 14-check
 08: $(call stamp,08) ## TC 패킷 변조 (변조 도구 = Red 무기)
 	@$(ENSURE)
 	$(RUN) go run ./examples/08-tc-mangle $(ARGS)

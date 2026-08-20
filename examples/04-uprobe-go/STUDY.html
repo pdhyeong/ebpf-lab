@@ -1,0 +1,922 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>커널 밖으로 나가는 훅</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&family=IBM+Plex+Serif:wght@600&display=swap">
+<style>
+  /* 단독 파일로 열 때를 위한 최소 리셋 (아티팩트 뷰어가 넣어주던 것) */
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; }
+  img, svg, video { max-width: 100%; height: auto; }
+  *, *::before, *::after { box-sizing: border-box; }
+</style>
+<style>
+  :root {
+    --ground: #F4F5F7;
+    --surface: #FFFFFF;
+    --surface-2: #EDEFF3;
+    --ink: #171A21;
+    --ink-2: #3B424F;
+    --muted: #646C7B;
+    --rule: #DBDFE6;
+    --rule-soft: #E8EBF0;
+    --kernel: #2E4BB5;
+    --kernel-bg: #E9EDFB;
+    --user: #A85A15;
+    --user-bg: #FBEFE1;
+    --ok: #2C7A55;
+    --ok-bg: #E4F2EB;
+    --warn-bg: #FBEDE9;
+    --warn: #A83E22;
+    --code-bg: #F0F2F6;
+    --shadow: 0 1px 2px rgba(23,26,33,.05), 0 8px 24px -16px rgba(23,26,33,.25);
+
+    --f-sans: 'IBM Plex Sans KR', 'Apple SD Gothic Neo', system-ui, -apple-system, sans-serif;
+    --f-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, SFMono-Regular, Menlo, monospace;
+    --f-serif: 'IBM Plex Serif', 'Apple SD Gothic Neo', Georgia, serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #101319;
+      --surface: #171B23;
+      --surface-2: #1D222C;
+      --ink: #E4E7EC;
+      --ink-2: #C2C8D2;
+      --muted: #8E97A6;
+      --rule: #262C38;
+      --rule-soft: #202632;
+      --kernel: #8FA4F2;
+      --kernel-bg: #1A2140;
+      --user: #E2A05C;
+      --user-bg: #302213;
+      --ok: #5CC191;
+      --ok-bg: #12291F;
+      --warn-bg: #2E1A16;
+      --warn: #E88F72;
+      --code-bg: #12161D;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px -18px rgba(0,0,0,.9);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #101319;
+    --surface: #171B23;
+    --surface-2: #1D222C;
+    --ink: #E4E7EC;
+    --ink-2: #C2C8D2;
+    --muted: #8E97A6;
+    --rule: #262C38;
+    --rule-soft: #202632;
+    --kernel: #8FA4F2;
+    --kernel-bg: #1A2140;
+    --user: #E2A05C;
+    --user-bg: #302213;
+    --ok: #5CC191;
+    --ok-bg: #12291F;
+    --warn-bg: #2E1A16;
+    --warn: #E88F72;
+    --code-bg: #12161D;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px -18px rgba(0,0,0,.9);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--f-sans);
+    font-weight: 400;
+    font-size: 16px;
+    line-height: 1.75;
+    -webkit-font-smoothing: antialiased;
+    word-break: keep-all;
+  }
+
+  .page {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 0 24px 96px;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0 40px;
+  }
+  .rail { display: none; }
+  @media (min-width: 1000px) {
+    .page { grid-template-columns: 160px minmax(0, 1fr); }
+    .rail { display: block; }
+  }
+
+  /* ---------------- masthead ---------------- */
+  .masthead {
+    grid-column: 1 / -1;
+    padding: 72px 0 40px;
+    border-bottom: 1px solid var(--rule);
+    margin-bottom: 48px;
+  }
+  .eyebrow {
+    font-family: var(--f-mono);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 18px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+  }
+  .eyebrow .sep { color: var(--rule); }
+  h1 {
+    font-family: var(--f-sans);
+    font-size: clamp(34px, 6vw, 52px);
+    font-weight: 700;
+    letter-spacing: -.02em;
+    line-height: 1.15;
+    margin: 0 0 20px;
+    text-wrap: balance;
+  }
+  .standfirst {
+    font-size: clamp(17px, 2.2vw, 19px);
+    color: var(--ink-2);
+    font-weight: 300;
+    max-width: none;
+    margin: 0;
+  }
+  .standfirst strong { font-weight: 600; color: var(--ink); }
+
+  /* ---------------- rail ---------------- */
+  .rail nav {
+    position: sticky;
+    top: 32px;
+    font-family: var(--f-mono);
+    font-size: 12.5px;
+    line-height: 1.5;
+    border-left: 1px solid var(--rule);
+    padding-left: 0;
+  }
+  .rail a {
+    display: flex;
+    gap: 10px;
+    padding: 7px 0 7px 14px;
+    color: var(--muted);
+    text-decoration: none;
+    border-left: 2px solid transparent;
+    margin-left: -1px;
+    transition: color .15s, border-color .15s;
+  }
+  .rail a:hover, .rail a:focus-visible { color: var(--ink); border-left-color: var(--kernel); }
+  .rail a .n { color: var(--rule); }
+  .rail a:hover .n { color: var(--kernel); }
+
+  /* ---------------- content ---------------- */
+  main { min-width: 0; max-width: 720px; margin-inline: auto; }
+  section { margin-bottom: 72px; scroll-margin-top: 24px; }
+  .prose { max-width: none; }
+
+  h2 {
+    font-size: clamp(24px, 3.4vw, 31px);
+    font-weight: 600;
+    letter-spacing: -.015em;
+    line-height: 1.25;
+    margin: 0 0 8px;
+    text-wrap: balance;
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+  }
+  h2 .stage {
+    font-family: var(--f-serif);
+    font-weight: 600;
+    font-size: .72em;
+    color: var(--kernel);
+    font-variant-numeric: tabular-nums;
+    flex: none;
+  }
+  .h2-sub {
+    color: var(--muted);
+    font-size: 15px;
+    margin: 0 0 32px 0;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--rule-soft);
+    max-width: none;
+  }
+  h3 {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -.01em;
+    margin: 40px 0 12px;
+    text-wrap: balance;
+  }
+  h4 {
+    font-family: var(--f-mono);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 32px 0 10px;
+  }
+  p { margin: 0 0 16px; max-width: none; }
+  ul, ol { margin: 0 0 16px; padding-left: 22px; max-width: none; }
+  li { margin-bottom: 8px; }
+  li::marker { color: var(--muted); }
+  strong { font-weight: 600; }
+  a { color: var(--kernel); }
+
+  code {
+    font-family: var(--f-mono);
+    font-size: .875em;
+    background: var(--code-bg);
+    border: 1px solid var(--rule-soft);
+    border-radius: 3px;
+    padding: .1em .35em;
+    word-break: break-word;
+  }
+  pre {
+    font-family: var(--f-mono);
+    background: var(--code-bg);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 18px 20px;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.65;
+    margin: 0 0 20px;
+    tab-size: 4;
+  }
+  pre code { background: none; border: 0; padding: 0; font-size: inherit; }
+  pre .c { color: var(--muted); }
+  pre .k { color: var(--kernel); font-weight: 500; }
+  pre .u { color: var(--user); font-weight: 500; }
+  pre .hl { color: var(--warn); font-weight: 500; }
+
+  figure { margin: 28px 0 32px; }
+  figure svg { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+  figcaption {
+    font-size: 13.5px;
+    color: var(--muted);
+    margin-top: 14px;
+    text-align: left;
+    max-width: none;
+    line-height: 1.6;
+  }
+  .figframe {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 24px 20px;
+    overflow-x: auto;
+    box-shadow: var(--shadow);
+  }
+
+  /* tables */
+  .tablewrap { overflow-x: auto; margin: 0 0 24px; border: 1px solid var(--rule); border-radius: 8px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; min-width: 460px; }
+  th, td { text-align: left; padding: 11px 16px; border-bottom: 1px solid var(--rule-soft); vertical-align: top; }
+  thead th {
+    font-family: var(--f-mono);
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--rule);
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+  td.mono, th.mono, .num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; font-size: 13px; }
+
+  /* callouts */
+  .note {
+    border-left: 3px solid var(--kernel);
+    background: var(--surface);
+    border-radius: 0 6px 6px 0;
+    padding: 16px 20px;
+    margin: 24px 0;
+    max-width: none;
+  }
+  .note.trap { border-left-color: var(--warn); }
+  .note.frida { border-left-color: var(--user); }
+  .note > :last-child { margin-bottom: 0; }
+  .note .label {
+    font-family: var(--f-mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--kernel);
+    display: block;
+    margin-bottom: 6px;
+  }
+  .note.trap .label { color: var(--warn); }
+  .note.frida .label { color: var(--user); }
+
+  .tag {
+    font-family: var(--f-mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: .06em;
+    padding: 2px 8px;
+    border-radius: 100px;
+    white-space: nowrap;
+  }
+  .tag.k { color: var(--kernel); background: var(--kernel-bg); }
+  .tag.u { color: var(--user); background: var(--user-bg); }
+
+  .split { display: grid; gap: 20px; margin: 24px 0; }
+  @media (min-width: 720px) { .split.two { grid-template-columns: 1fr 1fr; } }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 20px 22px;
+    box-shadow: var(--shadow);
+  }
+  .card h4 { margin-top: 0; }
+  .card > :last-child { margin-bottom: 0; }
+  .card p, .card ul { max-width: none; }
+
+  .lv {
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    background: var(--surface);
+    padding: 20px 22px;
+    margin-bottom: 16px;
+    box-shadow: var(--shadow);
+  }
+  .lv > :last-child { margin-bottom: 0; }
+  .lv-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+  .lv-num {
+    font-family: var(--f-mono);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    color: var(--user);
+    background: var(--user-bg);
+    padding: 3px 9px;
+    border-radius: 4px;
+  }
+  .lv-title { font-weight: 600; font-size: 16.5px; }
+  .lv p, .lv ul { max-width: none; }
+
+  .steps { counter-reset: step; list-style: none; padding: 0; max-width: none; }
+  .steps > li {
+    counter-increment: step;
+    position: relative;
+    padding-left: 44px;
+    margin-bottom: 28px;
+  }
+  .steps > li::before {
+    content: counter(step);
+    position: absolute;
+    left: 0;
+    top: 1px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--kernel-bg);
+    color: var(--kernel);
+    font-family: var(--f-mono);
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .steps > li > :first-child { margin-top: 0; }
+
+  hr.rule { border: 0; border-top: 1px solid var(--rule); margin: 0 0 48px; }
+
+  .kv { font-family: var(--f-mono); font-size: 13px; }
+
+  :focus-visible { outline: 2px solid var(--kernel); outline-offset: 3px; border-radius: 2px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  /* ---------------- 퀴즈 ---------------- */
+  .quizmeta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 20px;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin: 0 0 28px;
+    box-shadow: var(--shadow);
+    position: sticky;
+    top: 12px;
+    z-index: 5;
+  }
+  .scoreline {
+    font-family: var(--f-mono);
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+  .scoreline b { color: var(--kernel); font-weight: 600; }
+  .scorebar {
+    flex: 1 1 120px;
+    height: 6px;
+    min-width: 100px;
+    border-radius: 100px;
+    background: var(--surface-2);
+    overflow: hidden;
+  }
+  .scorebar i { display: block; height: 100%; width: 0; background: var(--ok); transition: width .25s ease; }
+  .btn-reset {
+    font-family: var(--f-mono);
+    font-size: 11.5px;
+    letter-spacing: .06em;
+    color: var(--muted);
+    background: none;
+    border: 1px solid var(--rule);
+    border-radius: 5px;
+    padding: 5px 12px;
+    cursor: pointer;
+  }
+  .btn-reset:hover { color: var(--ink); border-color: var(--muted); }
+
+  .qgroup { margin: 36px 0 12px; }
+  .qgroup h3 { margin-top: 0; }
+
+  .q {
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--rule);
+    border-radius: 0 8px 8px 0;
+    background: var(--surface);
+    padding: 16px 20px;
+    margin-bottom: 12px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px 16px;
+    align-items: start;
+  }
+  .q .qtext { font-size: 15.5px; line-height: 1.6; }
+  .q .qnum {
+    font-family: var(--f-mono);
+    font-size: 11.5px;
+    color: var(--muted);
+    margin-right: 8px;
+    font-variant-numeric: tabular-nums;
+  }
+  .q .ox { display: flex; gap: 8px; }
+  .q .ox button {
+    font-family: var(--f-mono);
+    font-size: 15px;
+    font-weight: 600;
+    width: 42px;
+    height: 38px;
+    border-radius: 6px;
+    border: 1px solid var(--rule);
+    background: var(--surface-2);
+    color: var(--ink-2);
+    cursor: pointer;
+    transition: border-color .15s, color .15s, background .15s;
+  }
+  .q .ox button:hover:not(:disabled) { border-color: var(--kernel); color: var(--kernel); }
+  .q .ox button:disabled { cursor: default; opacity: .55; }
+  .q .ox button.right { border-color: var(--ok); color: var(--ok); background: var(--ok-bg); opacity: 1; }
+  .q .ox button.wrong { border-color: var(--warn); color: var(--warn); background: var(--warn-bg); opacity: 1; }
+  .q.ok { border-left-color: var(--ok); }
+  .q.no { border-left-color: var(--warn); }
+  .q .exp {
+    grid-column: 1 / -1;
+    font-size: 14px;
+    line-height: 1.65;
+    color: var(--ink-2);
+    border-top: 1px dashed var(--rule);
+    padding-top: 12px;
+    margin: 2px 0 0;
+  }
+  .q .exp[hidden] { display: none; }
+  .q .exp .verdict {
+    font-family: var(--f-mono);
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    display: block;
+    margin-bottom: 5px;
+  }
+  .q.ok .exp .verdict { color: var(--ok); }
+  .q.no .exp .verdict { color: var(--warn); }
+
+  details.fill {
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    background: var(--surface);
+    padding: 0;
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+  details.fill > summary {
+    cursor: pointer;
+    padding: 16px 20px;
+    font-size: 15.5px;
+    list-style: none;
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+  }
+  details.fill > summary::-webkit-details-marker { display: none; }
+  details.fill > summary::after {
+    content: "정답 보기";
+    margin-left: auto;
+    font-family: var(--f-mono);
+    font-size: 11px;
+    letter-spacing: .08em;
+    color: var(--muted);
+    white-space: nowrap;
+    align-self: center;
+  }
+  details.fill[open] > summary::after { content: "닫기"; }
+  details.fill > summary:hover { background: var(--surface-2); }
+  details.fill .ans {
+    padding: 0 20px 18px;
+    border-top: 1px dashed var(--rule);
+    margin-top: 4px;
+    padding-top: 14px;
+    font-size: 14px;
+    color: var(--ink-2);
+  }
+  details.fill .ans > :last-child { margin-bottom: 0; }
+  details.fill pre { margin-bottom: 10px; }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+<header class="masthead">
+  <p class="eyebrow"><span>ebpf-lab</span><span class="sep">/</span><span>예제 04</span><span class="sep">/</span><span>uprobe (Go 바이너리)</span></p>
+  <h1>커널 밖으로 나가는 훅</h1>
+  <p class="standfirst">eBPF인데 대상이 커널이 아니다. <strong>내가 만든 Go 프로그램의 함수</strong>에 붙어서 인자를 읽는다. Frida를 써 봤다면 가장 익숙한 랩이고, 동시에 <strong>Frida와 eBPF의 경계가 가장 선명해지는</strong> 랩이다.</p>
+</header>
+
+<aside class="rail">
+  <nav aria-label="목차">
+    <a href="#s0"><span class="n">00</span><span>uprobe란</span></a>
+    <a href="#s1"><span class="n">01</span><span>이 랩이 하는 일</span></a>
+    <a href="#s2"><span class="n">02</span><span>단계 공략</span></a>
+    <a href="#s3"><span class="n">03</span><span>함정</span></a>
+    <a href="#quiz"><span class="n">04</span><span>퀴즈</span></a>
+  </nav>
+</aside>
+
+<main>
+<section id="s0">
+  <h2><span class="stage">00</span>uprobe란 무엇인가</h2>
+  <p class="h2-sub">파일의 오프셋에 트랩을 심는다. 프로세스가 아니라 파일이 대상이다.</p>
+
+  <div class="prose">
+    <h3>대상은 프로세스가 아니라 <strong>파일 + 오프셋</strong></h3>
+    <p>
+      여기가 Frida와 갈리는 첫 지점이다. Frida는 <em>실행 중인 프로세스</em>에 붙는다.
+      uprobe는 <strong>ELF 파일의 특정 오프셋</strong>에 등록한다. 그래서:
+    </p>
+    <ul>
+      <li>그 바이너리를 실행하는 <strong>모든 프로세스</strong>가 자동으로 걸린다 — 지금 것도, 앞으로 뜰 것도.</li>
+      <li>대상 프로세스가 죽어도 <strong>훅은 남아 있다</strong>. 다시 뜨면 또 잡힌다.</li>
+      <li>프로세스 하나만 보려면 <code>-pid</code>로 별도 지정해야 한다.</li>
+    </ul>
+    <p>
+      "이 바이너리를 실행하는 모든 컨테이너의 모든 프로세스"를 한 번에 거는 게 가능하다는 뜻이다.
+      Frida로는 프로세스마다 붙어야 하는 일이다.
+    </p>
+    <h3>동작 — 커널이 관리하는 브레이크포인트</h3>
+    <p>
+      커널이 해당 파일 페이지의 그 오프셋에 트랩 명령을 심는다(copy-on-write로 프로세스별 사본에).
+      실행이 거기 닿으면 트랩 → 커널 → 내 BPF 프로그램. 프로세스는 <strong>자기가 후킹당한 걸 모른다</strong>.
+    </p>
+    <h3>Go 함수를 잡을 때의 두 가지 함정</h3>
+    <div class="split two">
+      <div class="card">
+        <h4>1 · 레지스터 호출 규약</h4>
+        <p style="margin-bottom:0">Go 1.17+는 regabi를 쓴다. 첫 정수 인자가 arm64는 <code>X0</code>, amd64는 <code>RAX</code>.
+        <code>BPF_UPROBE</code> 매크로가 <code>PT_REGS_PARM1</code>로 알아서 골라준다.
+        <strong>Go 1.16 이하(스택 기반)라면 이 방법이 통하지 않는다.</strong></p>
+      </div>
+      <div class="card">
+        <h4>2 · uretprobe 금지</h4>
+        <p style="margin-bottom:0">Go에서 <strong>uretprobe를 쓰면 대상 프로세스가 죽을 수 있다.</strong>
+        고루틴 스택이 이동(grow)하면 uretprobe가 심어둔 복귀 주소가 무효화되기 때문이다.
+        반환값이 필요하면 <strong>함수의 return 지점 오프셋에 uprobe</strong>를 붙인다.</p>
+      </div>
+    </div>
+  </div>
+  <div class="note frida">
+    <span class="label">Frida와 나란히</span>
+    <div class="tablewrap" style="margin:10px 0 0">
+      <table>
+        <thead><tr><th></th><th>Frida</th><th>uprobe + eBPF</th></tr></thead>
+        <tbody>
+          <tr><td><strong>대상</strong></td><td>프로세스</td><td>파일 오프셋 (그 파일의 모든 프로세스)</td></tr>
+          <tr><td><strong>인자 읽기</strong></td><td><code>args[0]</code> 자유롭게</td><td><code>BPF_UPROBE</code>로 받되 메모리는 헬퍼 경유</td></tr>
+          <tr><td><strong>반환값</strong></td><td><code>onLeave</code> 쉽게</td><td>Go에선 <strong>위험</strong> — return 오프셋에 별도 uprobe</td></tr>
+          <tr><td><strong>값 수정</strong></td><td><strong>가능</strong> (인자·반환값 변조)</td><td><strong>불가</strong> — 관찰만</td></tr>
+          <tr><td><strong>탐지 회피</strong></td><td>프로세스가 알아챌 수 있음</td><td>프로세스는 모름 (커널이 관리)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin:12px 0 0"><strong>결론:</strong> 값을 바꿔야 하면 Frida, <strong>넓게 오래 관찰</strong>해야 하면 uprobe다.</p>
+  </div>
+
+</section>
+
+<section id="s1">
+  <h2><span class="stage">01</span>이 랩이 하는 일</h2>
+  <p class="h2-sub">target/workload 의 main.compute(n) 진입을 잡아 인자 n 을 읽는다.</p>
+
+  <div class="prose">
+    <p><code>target/workload/main.go</code>는 500ms마다 <code>compute(n)</code>을 부르는 단순한 프로그램이다:</p>
+  </div>
+  <pre><code>func compute(n int) int {
+        sum := 0
+        for i := 0; i &lt;= n; i++ { sum += i * i }
+        return sum
+}</code></pre>
+  <div class="prose">
+    <p>이 <code>main.compute</code>의 진입점에 uprobe를 붙여 <code>n</code>을 훔쳐본다. 실제 대상 지정은 <strong>Go 쪽</strong>에서 한다:</p>
+  </div>
+  <pre><code>ex, _ := link.OpenExecutable("/opt/lab/bin/workload")
+up, _ := ex.Uprobe("main.compute", objs.UprobeCompute, nil)</code></pre>
+  <div class="prose">
+    <p>
+      <code>.bpf.c</code>의 <code>SEC("uprobe/main.compute")</code>는 <strong>라벨일 뿐</strong>이다 — 실제 파일/심볼과 무관하다.
+      그래서 같은 BPF 프로그램을 <code>-bin</code>/<code>-sym</code> 플래그로 다른 바이너리에 붙일 수 있다.
+    </p>
+  </div>
+  <div class="note trap">
+    <span class="label">이 랩 최대의 함정 · virtiofs</span>
+    <p style="margin-bottom:0">
+      <strong>uprobe는 <code>/lab</code>(macOS 바인드 마운트 = virtiofs) 위의 파일에 붙을 수 없다.</strong>
+      <code>perf_event_open</code>이 <code>EIO</code>로 실패한다. 그래서 타깃을 컨테이너 자체 파일시스템인
+      <code>/opt/lab/bin/workload</code>로 빌드한다(<code>make workload</code>).
+      이건 macOS + Docker Desktop 환경 특유의 문제로, 원인을 모르면 몇 시간을 날린다.
+    </p>
+  </div>
+  <div class="prose"><h3>실행</h3></div>
+  <pre><code>make 04            <span class="c"># workload 를 자동으로 띄우고 붙는다</span>
+make 04-check      <span class="c"># 채점</span>
+make workload-stop <span class="c"># 타깃 종료</span></code></pre>
+
+</section>
+
+<section id="s2">
+  <h2><span class="stage">02</span>단계 공략</h2>
+  <p class="h2-sub">빈칸 4개. Lv3은 한 줄인데, 그 한 줄이 되는 이유가 이 랩의 핵심이다.</p>
+
+  <div class="lv">
+    <div class="lv-head"><span class="lv-num">LV 1 · 30점</span><span class="lv-title">링버퍼 예약</span></div>
+    <pre><code>e = bpf_ringbuf_reserve(&amp;events, sizeof(*e), 0);</code></pre>
+    <p style="margin-bottom:0">01번과 같다. 이벤트가 안 나오면 <strong>workload가 떠 있는지</strong>부터 확인하라
+    (<code>pgrep -x workload</code>). 채점 스크립트는 자동으로 띄운다.</p>
+  </div>
+  <div class="lv">
+    <div class="lv-head"><span class="lv-num">LV 2 · 25점</span><span class="lv-title">누가 언제 불렀나</span></div>
+    <pre><code>__u64 id = bpf_get_current_pid_tgid();
+e-&gt;tgid = id &gt;&gt; 32;
+e-&gt;pid  = (__u32)id;
+e-&gt;ts   = bpf_ktime_get_ns();
+bpf_get_current_comm(&amp;e-&gt;comm, sizeof(e-&gt;comm));</code></pre>
+    <p style="margin-bottom:0"><strong>왜 <code>comm</code>이 <code>workload</code>인가:</strong>
+    uprobe는 <strong>대상 프로세스의 컨텍스트</strong>에서 실행된다. "현재 프로세스"가 곧 후킹당한 프로세스라는 뜻이다.
+    <code>bpf_ktime_get_ns()</code>는 <strong>부팅 기준 단조 시각</strong>이지 벽시계가 아니다 —
+    <code>main.go</code>가 부팅 시각을 더해서 사람이 읽는 시간으로 바꾼다.</p>
+  </div>
+  <div class="lv">
+    <div class="lv-head"><span class="lv-num">LV 3 · 20점</span><span class="lv-title">함수 인자 읽기</span></div>
+    <pre><code>e-&gt;arg = n;</code></pre>
+    <p><strong>한 줄이다.</strong> 그런데 이 한 줄이 되는 이유가 이 랩에서 제일 중요하다:</p>
+    <pre><code>SEC("uprobe/main.compute")
+int BPF_UPROBE(uprobe_compute, <span class="k">long n</span>)
+<span class="c">//  ↑ 이 매크로가 내부적으로 PT_REGS_PARM1(ctx) 로 확장된다</span>
+<span class="c">//    arm64 → X0,  x86_64 → RAX  (아키텍처를 신경 쓸 필요가 없다)</span></code></pre>
+    <p style="margin-bottom:0"><strong>주의:</strong> 인자가 포인터(문자열·슬라이스·구조체)라면 이렇게 못 읽는다.
+    <code>bpf_probe_read_user_str()</code> 등으로 <strong>유저 메모리를 복사</strong>해야 한다.
+    여기서는 <code>int</code>라 레지스터 값이 곧 값이다.</p>
+  </div>
+  <div class="lv">
+    <div class="lv-head"><span class="lv-num">LV 4 · 10점</span><span class="lv-title">인자 기반 필터 (보너스)</span></div>
+    <pre><code>if (n &lt; 1000)
+        return 0;   <span class="c">// 예약 전에 거르는 게 가장 싸다</span></code></pre>
+    <p style="margin-bottom:0"><strong>이 패턴이 실무의 전부다.</strong> "특정 조건의 호출만 본다"를
+    <strong>커널에서</strong> 판정하면 유저 공간 비용이 0이 된다. 12번 안티치트 게임이 정확히 이 구조로
+    "HP가 100을 넘는 비정상 값"을 잡아낸다.</p>
+  </div>
+
+</section>
+
+<section id="s3">
+  <h2><span class="stage">03</span>함정과 확장</h2>
+  <p class="h2-sub">uprobe 특유의 문제들.</p>
+
+  <div class="note trap">
+    <span class="label">함정 1 · EIO 로 부착 실패</span>
+    <p style="margin-bottom:0">virtiofs 위의 파일이다. <code>/opt/lab/bin/</code>에 빌드한 바이너리를 대상으로 하라
+    (<code>make workload</code>). 이 랩에서 가장 자주 막히는 지점이다.</p>
+  </div>
+  <div class="note trap">
+    <span class="label">함정 2 · 심볼을 못 찾는다</span>
+    <p style="margin-bottom:0">
+      Go 바이너리가 스트립됐거나 함수가 인라인된 경우다. 확인:<br>
+      <code>go tool nm /opt/lab/bin/workload | grep main.compute</code><br>
+      인라인을 막으려면 <code>//go:noinline</code>을 붙인다. C/C++이면 <code>nm -D</code>로 동적 심볼을 본다.
+    </p>
+  </div>
+  <div class="note trap">
+    <span class="label">함정 3 · uretprobe 로 Go 프로세스가 죽는다</span>
+    <p style="margin-bottom:0">
+      절대 쓰지 마라. 고루틴 스택이 이동하면 심어둔 복귀 주소가 무효화된다.
+      반환값이 필요하면 <code>objdump</code>로 <code>ret</code> 명령 오프셋을 찾아 거기에 <strong>uprobe</strong>를 붙인다.
+      (C/C++ 처럼 스택이 고정된 언어에서는 uretprobe가 안전하다.)
+    </p>
+  </div>
+  <div class="prose">
+    <h3>여기서 확장하면</h3>
+    <ul>
+      <li><strong>다른 바이너리 잡기</strong> — <code>make 04 ARGS="-bin /usr/bin/curl -sym main"</code></li>
+      <li><strong>라이브러리 함수</strong> — <code>libssl.so</code>의 <code>SSL_write</code>에 붙이면 <strong>암호화 전 평문</strong>이 보인다.
+        실무 eBPF 관측 도구들이 실제로 쓰는 기법이다.</li>
+      <li><strong>USDT</strong> — 애플리케이션이 미리 심어둔 정적 추적점. uprobe의 tracepoint 버전이라고 보면 된다.</li>
+    </ul>
+    <h3>다음</h3>
+    <p>05·06번은 훅을 <strong>네트워크</strong>로 옮긴다. 지금까지는 전부 "관찰"이었지만,
+    거기서부터는 <strong>패킷의 운명을 반환값으로 결정</strong>하기 시작한다.</p>
+  </div>
+
+</section>
+
+<section id="quiz">
+  <h2><span class="stage">04</span>퀴즈</h2>
+  <p class="h2-sub">O/X를 누르면 바로 채점되고 해설이 열린다. 틀린 문제의 해설이 진짜 공부다.</p>
+  <div class="quizmeta">
+    <span class="scoreline">점수 <b id="qscore">0</b> / <span id="qtotal">12</span></span>
+    <span class="scorebar"><i id="qbar"></i></span>
+    <span class="scoreline" id="qmsg" style="color:var(--muted)">아직 안 풀었다</span>
+    <button class="btn-reset" id="qreset" type="button">다시 풀기</button>
+  </div>
+  <div class="qgroup">
+    <h3>A. O / X</h3>
+<div class="q" data-a="X">
+  <div class="qtext"><span class="qnum">01</span>uprobe는 실행 중인 특정 프로세스에 붙는다.</div>
+  <div class="ox"><button type="button" data-v="O">O</button><button type="button" data-v="X">X</button></div>
+  <p class="exp" hidden><span class="verdict"></span>정답 <strong>X</strong>. <strong>ELF 파일의 오프셋</strong>에 등록한다. 그래서 그 바이너리를 실행하는 모든 프로세스가 자동으로 걸리고, 앞으로 뜰 프로세스도 걸린다.</p>
+</div>
+
+<div class="q" data-a="X">
+  <div class="qtext"><span class="qnum">02</span>대상 프로세스가 종료되면 uprobe 등록도 함께 사라진다.</div>
+  <div class="ox"><button type="button" data-v="O">O</button><button type="button" data-v="X">X</button></div>
+  <p class="exp" hidden><span class="verdict"></span>정답 <strong>X</strong>. 훅은 파일 오프셋에 남아 있다. 같은 바이너리가 다시 실행되면 또 잡힌다. 이게 Frida와의 결정적 차이다.</p>
+</div>
+
+<div class="q" data-a="O">
+  <div class="qtext"><span class="qnum">03</span>Go 프로그램에 uretprobe를 붙이면 대상 프로세스가 죽을 수 있다.</div>
+  <div class="ox"><button type="button" data-v="O">O</button><button type="button" data-v="X">X</button></div>
+  <p class="exp" hidden><span class="verdict"></span>정답 <strong>O</strong>. 고루틴 스택이 이동하면 uretprobe가 심어둔 복귀 주소가 무효화된다. 반환값이 필요하면 return 지점 오프셋에 <strong>uprobe</strong>를 붙인다.</p>
+</div>
+
+<div class="q" data-a="X">
+  <div class="qtext"><span class="qnum">04</span><code>SEC("uprobe/main.compute")</code>의 문자열이 실제 대상 심볼을 결정한다.</div>
+  <div class="ox"><button type="button" data-v="O">O</button><button type="button" data-v="X">X</button></div>
+  <p class="exp" hidden><span class="verdict"></span>정답 <strong>X</strong>. <strong>라벨일 뿐</strong>이다. 실제 파일과 심볼은 Go 쪽 <code>link.OpenExecutable(...).Uprobe("main.compute", ...)</code>에서 정한다.</p>
+</div>
+
+<div class="q" data-a="O">
+  <div class="qtext"><span class="qnum">05</span><code>BPF_UPROBE</code> 매크로 덕분에 arm64와 x86_64에서 같은 코드가 동작한다.</div>
+  <div class="ox"><button type="button" data-v="O">O</button><button type="button" data-v="X">X</button></div>
+  <p class="exp" hidden><span class="verdict"></span>정답 <strong>O</strong>. 내부적으로 <code>PT_REGS_PARM1</code>로 확장되고, 그게 arm64에서는 <code>X0</code>, x86_64에서는 <code>RAX</code>로 풀린다.</p>
+</div>
+
+<div class="q" data-a="X">
+  <div class="qtext"><span class="qnum">06</span>Go 1.16 이하의 바이너리에서도 이 예제 방식이 그대로 통한다.</div>
+  <div class="ox"><button type="button" data-v="O">O</button><button type="button" data-v="X">X</button></div>
+  <p class="exp" hidden><span class="verdict"></span>정답 <strong>X</strong>. Go 1.17부터 레지스터 기반 호출 규약(regabi)이다. 그 이전은 스택 기반이라 인자를 스택에서 읽어야 한다.</p>
+</div>
+
+<div class="q" data-a="O">
+  <div class="qtext"><span class="qnum">07</span>uprobe 프로그램 안에서 <code>bpf_get_current_comm()</code>은 후킹당한 프로세스의 이름을 돌려준다.</div>
+  <div class="ox"><button type="button" data-v="O">O</button><button type="button" data-v="X">X</button></div>
+  <p class="exp" hidden><span class="verdict"></span>정답 <strong>O</strong>. uprobe는 <strong>대상 프로세스의 컨텍스트</strong>에서 실행되기 때문이다. 그래서 이 랩에서 COMM이 <code>workload</code>로 찍힌다.</p>
+</div>
+
+<div class="q" data-a="X">
+  <div class="qtext"><span class="qnum">08</span><code>bpf_ktime_get_ns()</code>는 UTC 벽시계 시각을 나노초로 돌려준다.</div>
+  <div class="ox"><button type="button" data-v="O">O</button><button type="button" data-v="X">X</button></div>
+  <p class="exp" hidden><span class="verdict"></span>정답 <strong>X</strong>. <strong>부팅 기준 단조 시각</strong>이다. 사람이 읽는 시간으로 바꾸려면 유저 공간에서 부팅 시각을 더해야 한다 — <code>main.go</code>가 그 일을 한다.</p>
+</div>
+
+<div class="q" data-a="X">
+  <div class="qtext"><span class="qnum">09</span>함수 인자가 문자열 포인터여도 <code>e-&gt;arg = n;</code>처럼 바로 값을 담으면 된다.</div>
+  <div class="ox"><button type="button" data-v="O">O</button><button type="button" data-v="X">X</button></div>
+  <p class="exp" hidden><span class="verdict"></span>정답 <strong>X</strong>. 포인터는 주소일 뿐이다. 내용을 보려면 <code>bpf_probe_read_user_str()</code>로 유저 메모리를 복사해야 한다. 이 랩은 <code>int</code>라 레지스터 값이 곧 값이다.</p>
+</div>
+
+<div class="q" data-a="X">
+  <div class="qtext"><span class="qnum">10</span>uprobe로 함수의 인자 값을 <strong>변조</strong>할 수 있다.</div>
+  <div class="ox"><button type="button" data-v="O">O</button><button type="button" data-v="X">X</button></div>
+  <p class="exp" hidden><span class="verdict"></span>정답 <strong>X</strong>. eBPF 트레이싱 프로그램은 관찰만 한다. 값을 바꾸려면 Frida 같은 도구가 필요하다. "바꿀 것인가 볼 것인가"가 두 도구를 가르는 기준이다.</p>
+</div>
+
+<div class="q" data-a="O">
+  <div class="qtext"><span class="qnum">11</span>macOS 바인드 마운트(<code>/lab</code>) 위의 바이너리에는 uprobe를 붙일 수 없다.</div>
+  <div class="ox"><button type="button" data-v="O">O</button><button type="button" data-v="X">X</button></div>
+  <p class="exp" hidden><span class="verdict"></span>정답 <strong>O</strong>. virtiofs에서 <code>perf_event_open</code>이 <code>EIO</code>로 실패한다. 그래서 타깃을 컨테이너 파일시스템(<code>/opt/lab/bin</code>)에 빌드한다.</p>
+</div>
+
+<div class="q" data-a="X">
+  <div class="qtext"><span class="qnum">12</span>인자 조건으로 걸러야 한다면 링버퍼에 올린 뒤 유저 공간에서 버리는 게 낫다.</div>
+  <div class="ox"><button type="button" data-v="O">O</button><button type="button" data-v="X">X</button></div>
+  <p class="exp" hidden><span class="verdict"></span>정답 <strong>X</strong>. 커널에서 <strong>예약 전에</strong> 거르는 게 가장 싸다. 유저 공간까지 올려서 버리면 그게 곧 오버헤드다. 12번 안티치트가 이 구조를 그대로 쓴다.</p>
+</div>
+  </div>
+  <div class="qgroup">
+    <h3>B. 빈칸 채우기</h3>
+    <p style="color:var(--muted); font-size:14px; margin-bottom:16px">코드를 보지 않고 먼저 답해 보고, 눌러서 확인한다.</p>
+<details class="fill">
+  <summary><span class="qnum">C1</span><span>Go 바이너리에서 대상 심볼이 존재하는지 확인하는 명령은?</span></summary>
+  <div class="ans"><pre><code>go tool nm /opt/lab/bin/workload | grep main.compute</code></pre><p style="margin-bottom:0">없다면 스트립됐거나 인라인된 것이다. <code>//go:noinline</code>으로 인라인을 막을 수 있다.</p></div>
+</details>
+
+<details class="fill">
+  <summary><span class="qnum">C2</span><span>유저 공간 문자열 인자를 읽어야 할 때 쓰는 헬퍼는?<br><code>______(&amp;buf, sizeof(buf), (void *)ptr);</code></span></summary>
+  <div class="ans"><pre><code>bpf_probe_read_user_str(&amp;buf, sizeof(buf), (void *)ptr);</code></pre><p style="margin-bottom:0">uprobe의 인자 포인터는 항상 <strong>유저 공간</strong>을 가리킨다. <code>_kernel</code>을 쓰면 조용히 빈 문자열이 나온다.</p></div>
+</details>
+
+<details class="fill">
+  <summary><span class="qnum">C3</span><span>uprobe 타깃 바이너리를 컨테이너 파일시스템에 빌드하는 make 타깃은?</span></summary>
+  <div class="ans"><pre><code>make workload   # -> /opt/lab/bin/workload</code></pre><p style="margin-bottom:0"><code>/lab</code>(virtiofs) 위에 두면 <code>perf_event_open</code>이 <code>EIO</code>로 실패한다.</p></div>
+</details>
+  </div>
+</section>
+</main>
+</div>
+<script>
+(function () {
+  var qs = Array.prototype.slice.call(document.querySelectorAll('.q'));
+  var scoreEl = document.getElementById('qscore');
+  var totalEl = document.getElementById('qtotal');
+  var barEl = document.getElementById('qbar');
+  var msgEl = document.getElementById('qmsg');
+  var resetEl = document.getElementById('qreset');
+  if (!qs.length || !scoreEl) return;
+
+  totalEl.textContent = qs.length;
+
+  function update() {
+    var done = qs.filter(function (q) { return q.classList.contains('done'); }).length;
+    var ok = qs.filter(function (q) { return q.classList.contains('ok'); }).length;
+    scoreEl.textContent = ok;
+    barEl.style.width = (ok / qs.length * 100) + '%';
+    if (done === 0) { msgEl.textContent = '아직 안 풀었다'; return; }
+    if (done < qs.length) { msgEl.textContent = done + '문항 풀었다'; return; }
+    var pct = ok / qs.length;
+    msgEl.textContent = pct === 1 ? '전부 정답. 03번으로 가도 된다.'
+      : pct >= 0.8 ? '통과. 틀린 해설만 다시 읽어라.'
+      : pct >= 0.6 ? '아깝다. 틀린 절을 다시 보고 재도전.'
+      : '해당 절을 다시 읽고 오는 게 빠르다.';
+  }
+
+  qs.forEach(function (q) {
+    q.querySelectorAll('.ox button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (q.classList.contains('done')) return;
+        var right = q.dataset.a;
+        var correct = b.dataset.v === right;
+        q.classList.add('done', correct ? 'ok' : 'no');
+        q.querySelectorAll('.ox button').forEach(function (x) {
+          x.disabled = true;
+          if (x.dataset.v === right) x.classList.add('right');
+          else if (x === b) x.classList.add('wrong');
+        });
+        var exp = q.querySelector('.exp');
+        exp.hidden = false;
+        exp.querySelector('.verdict').textContent = correct ? '정답' : '오답';
+        update();
+      });
+    });
+  });
+
+  resetEl.addEventListener('click', function () {
+    qs.forEach(function (q) {
+      q.classList.remove('done', 'ok', 'no');
+      q.querySelector('.exp').hidden = true;
+      q.querySelectorAll('.ox button').forEach(function (x) {
+        x.disabled = false;
+        x.classList.remove('right', 'wrong');
+      });
+    });
+    update();
+    document.getElementById('s9').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
+  update();
+})();
+</script>
+</body>
+</html>
